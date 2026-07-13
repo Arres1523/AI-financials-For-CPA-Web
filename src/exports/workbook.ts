@@ -41,14 +41,10 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
   pnl.getCell("A3").value = `Generated: ${genDate}`;
   pnl.mergeCells("A3:B3");
 
-  const hasWarnings = input.flaggedTransactions.length > 0 ||
-    Math.abs(input.reports.balanceSheet.balanceCheck) > 0.01;
-
-  if (hasWarnings) {
-    pnl.getCell("A4").value = "⚠ PRELIMINARY — See footnotes. Does not substitute CPA review.";
-    pnl.getCell("A4").font = { bold: true, color: { argb: "CC5500" } };
-    pnl.mergeCells("A4:B4");
-  }
+  // P&L always shows warnings — this is a preliminary report by design
+  pnl.getCell("A4").value = "⚠ PRELIMINARY — Based on bank activity only. Does not substitute CPA review.";
+  pnl.getCell("A4").font = { bold: true, color: { argb: "CC5500" } };
+  pnl.mergeCells("A4:B4");
 
   pnl.addRow([]);
   pnl.addRow(["Category", "Amount"]);
@@ -61,8 +57,8 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
   pnl.addRow(["INCOME"]);
   bold(pnl.getCell(`A${pnl.rowCount}`));
   const firstIncome = pnl.rowCount + 1;
-  for (const [line, _amount] of Object.entries(input.reports.pnl.income)) {
-    pnl.addRow([line, 0]);
+  for (const [line, amount] of Object.entries(input.reports.pnl.income)) {
+    pnl.addRow([line, amount]);
     pnl.getCell(`B${pnl.rowCount}`).numFmt = fmt;
   }
   const lastIncome = pnl.rowCount;
@@ -76,8 +72,8 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
   pnl.addRow(["EXPENSES"]);
   bold(pnl.getCell(`A${pnl.rowCount}`));
   const firstExpense = pnl.rowCount + 1;
-  for (const [line, _amount] of Object.entries(input.reports.pnl.expenses)) {
-    pnl.addRow([line, 0]);
+  for (const [line, amount] of Object.entries(input.reports.pnl.expenses)) {
+    pnl.addRow([line, amount]);
     pnl.getCell(`B${pnl.rowCount}`).numFmt = fmt;
   }
   const lastExpense = pnl.rowCount;
@@ -94,22 +90,21 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
   pnl.getCell(`B${niRow}`).numFmt = fmt;
   pnl.getCell(`B${niRow}`).font = { bold: true, italic: true };
 
-  // ─── Balance Sheet ──────────────────────────────────────────
+  // ─── Preliminary Balance Sheet from Bank Activity ──────────
   const bs = workbook.addWorksheet("Balance Sheet", { views: [{ showGridLines: false }] });
   bs.columns = [{ width: 38 }, { width: 18 }];
 
   headerRow(bs.getCell("A1"), input.companyName);
   bs.mergeCells("A1:B1");
-  bs.getCell("A2").value = `Balance Sheet — As of December 31, ${input.taxYear}`;
+  bs.getCell("A2").value = `Preliminary Balance Sheet from Bank Activity — As of December 31, ${input.taxYear}`;
   bs.mergeCells("A2:B2");
   bs.getCell("A3").value = `Generated: ${genDate}`;
   bs.mergeCells("A3:B3");
 
-  if (hasWarnings) {
-    bs.getCell("A4").value = "⚠ PRELIMINARY — See footnotes. Does not substitute CPA review.";
-    bs.getCell("A4").font = { bold: true, color: { argb: "CC5500" } };
-    bs.mergeCells("A4:B4");
-  }
+  // Warning always shown — this report is preliminary by design
+  bs.getCell("A4").value = "⚠ PRELIMINARY — This report is based on classified bank activity and does not represent actual period-end account balances. Only imported bank movements are included. Does not substitute CPA review.";
+  bs.getCell("A4").font = { bold: true, color: { argb: "CC5500" } };
+  bs.mergeCells("A4:B4");
 
   bs.addRow([]);
   bs.addRow(["Category", "Amount"]);
@@ -124,8 +119,8 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
     bold(bs.getCell(`A${currentRow}`));
     currentRow = bs.rowCount + 1;
     const first = currentRow;
-    for (const line of Object.keys(lines)) {
-      bs.addRow([line, 0]);
+    for (const [line, value] of Object.entries(lines)) {
+      bs.addRow([line, value]);
       bs.getCell(`B${bs.rowCount}`).numFmt = fmt;
     }
     const last = bs.rowCount;
@@ -174,16 +169,15 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
     }
   }
 
-  if (hasWarnings) {
-    bs.addRow([]);
-    bs.addRow(["⚠ These financial statements are PRELIMINARY. They were generated solely from"]);
-    bs.addRow(["  the uploaded bank statement data and may not reflect all transactions, assets,"]);
-    bs.addRow(["  liabilities, or equity items. This report does not substitute professional"]);
-    bs.addRow(["  accounting or CPA review. Do not use for tax filing or financial decisions"]);
-    bs.addRow(["  without verification by a qualified CPA."]);
-    for (let r = bs.rowCount - 4; r <= bs.rowCount; r++) {
-      bs.getCell(`A${r}`).font = { italic: true, color: { argb: "666666" } };
-    }
+  // Always show disclaimer — this report is preliminary by design
+  bs.addRow([]);
+  bs.addRow(["⚠ These financial statements are PRELIMINARY. They were generated solely from"]);
+  bs.addRow(["  the uploaded bank statement data and may not reflect all transactions, assets,"]);
+  bs.addRow(["  liabilities, or equity items. This report does not substitute professional"]);
+  bs.addRow(["  accounting or CPA review. Do not use for tax filing or financial decisions"]);
+  bs.addRow(["  without verification by a qualified CPA."]);
+  for (let r = bs.rowCount - 4; r <= bs.rowCount; r++) {
+    bs.getCell(`A${r}`).font = { italic: true, color: { argb: "666666" } };
   }
 
   // ─── Transaction History (optional) ─────────────────────────
@@ -201,12 +195,15 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
       const t = input.transactions[i];
       const c = input.classifications[i];
       if (c?.reviewStatus === "excluded") continue;
+      const dt = new Date(t.date);
+      const excelDate = isNaN(dt.getTime()) ? t.date : dt;
       const row = th.addRow({
-        date: t.date,
+        date: excelDate,
         description: t.description,
         amount: t.amount,
         finalCategory: c?.finalCategory ?? "Unclassified",
       });
+      row.getCell(1).numFmt = "yyyy-mm-dd";
       row.getCell(3).numFmt = fmt;
     }
   }

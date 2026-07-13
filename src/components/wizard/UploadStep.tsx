@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { BankAccount, ColumnMapping, UploadPreview, ImportError, Workspace } from "@/domain/types";
 import ColumnMapper from "./ColumnMapper";
 
@@ -18,17 +18,24 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
   const [selectedAccount, setSelectedAccount] = useState("");
   const [results, setResults] = useState<{ imported: number; errors: ImportError[]; statementId: string }[]>([]);
   const [fileError, setFileError] = useState("");
+  const [importStatus, setImportStatus] = useState<"idle" | "success" | "partial" | "error">("idle");
   const fileRef = useRef<HTMLInputElement>(null);
   const fileBuffersRef = useRef<Map<string, ArrayBuffer>>(new Map());
+  const continueRef = useRef<HTMLDivElement>(null);
+
+  function resetFileInput() {
+    if (fileRef.current) fileRef.current.value = "";
+  }
 
   async function handleFileSelectWithBuffer(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     setFileError("");
+    setImportStatus("idle");
 
     for (const file of Array.from(files)) {
       if (!file.name.toLowerCase().endsWith(".xlsx")) {
-        setFileError(`"${file.name}" is not an .xlsx file. Only .xlsx is accepted.`);
+        setFileError(`"${file.name}" is not an .xlsx file. Only .xlsx files are accepted.`);
         continue;
       }
 
@@ -43,12 +50,13 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
         const preview: UploadPreview = await res.json();
         setPreviews((prev) => [...prev, { ...preview, fileName: file.name }]);
       } else {
-        const err = await res.json();
-        setFileError(err.error || "Upload failed");
+        let msg = "Upload preview failed";
+        try { const err = await res.json(); msg = err.error || msg; } catch {}
+        setFileError(msg);
       }
     }
 
-    if (fileRef.current) fileRef.current.value = "";
+    resetFileInput();
   }
 
   function updateMapping(fileName: string, mapping: ColumnMapping) {
@@ -56,14 +64,16 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
   }
 
   async function doImport(preview: UploadPreview) {
-    if (!selectedAccount) { setFileError("Select a bank account"); return; }
+    if (!selectedAccount) { setFileError("Select a bank account first"); return; }
+
     const mapping = mappings[preview.fileName] || preview.detectedMapping as ColumnMapping;
     if (!mapping.date || !mapping.description || (!mapping.amount && !(mapping.debit && mapping.credit))) {
-      setFileError("Complete the column mapping first");
+      setFileError("Complete the column mapping first (date, description, and amount are required)");
       return;
     }
+
     const buffer = fileBuffersRef.current.get(preview.fileName);
-    if (!buffer) { setFileError("File buffer not found, please re-upload"); return; }
+    if (!buffer) { setFileError("File buffer expired — please re-upload"); return; }
 
     setUploading(true);
     setFileError("");
@@ -81,14 +91,29 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
       const data = await res.json();
       setResults((prev) => [...prev, data]);
       setPreviews((prev) => prev.filter((p) => p.fileName !== preview.fileName));
+      setImportStatus(data.errors && data.errors.length > 0 ? "partial" : "success");
     } else {
-      const err = await res.json();
-      setFileError(err.error || "Import failed");
+      let msg = "Import failed";
+      try {
+        const err = await res.json();
+        const errList: ImportError[] = err.errors || [];
+        msg = errList.length > 0 ? errList.map((e: ImportError) => e.message).join("; ") : (err.error || `Server error (${res.status})`);
+      } catch {}
+      setFileError(msg);
+      setImportStatus("error");
     }
+
     setUploading(false);
   }
 
+  useEffect(() => {
+    if (results.length > 0 && continueRef.current) {
+      continueRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [results.length]);
+
   const totalImported = results.reduce((s, r) => s + r.imported, 0);
+  const totalErrors = results.reduce((s, r) => s + r.errors.length, 0);
 
   return (
     <div className="space-y-6">
@@ -120,8 +145,31 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
         <p className="mt-2 text-xs text-slate-400">Accepts .xlsx files only, multiple files allowed</p>
       </div>
 
-      {fileError && <p className="text-sm text-red-600">{fileError}</p>}
+      {/* Error banner */}
+      {fileError && (
+        <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">
+          <p className="font-medium">⚠ {fileError}</p>
+        </div>
+      )}
 
+      {/* Import status banners */}
+      {importStatus === "success" && (
+        <div className="rounded border border-sage/30 bg-sage/10 p-4 text-sm text-sage" role="status">
+          <p className="font-medium">✓ Import successful — {totalImported} transactions loaded</p>
+        </div>
+      )}
+      {importStatus === "partial" && (
+        <div className="rounded border border-brass/30 bg-brass/10 p-4 text-sm text-brass" role="alert">
+          <p className="font-medium">⚠ Imported with warnings — review details below</p>
+        </div>
+      )}
+      {importStatus === "error" && (
+        <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">
+          <p className="font-medium">✕ Import failed — see error above and try again</p>
+        </div>
+      )}
+
+      {/* Preview cards for each uploaded file */}
       {previews.map((preview) => (
         <div key={preview.fileName} className="rounded border border-line p-4 space-y-4">
           <div className="flex items-center justify-between">
@@ -135,10 +183,17 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
             </div>
             <button
               onClick={() => doImport(preview)}
-              disabled={uploading}
-              className="rounded bg-sage px-4 py-2 text-sm text-white disabled:opacity-40"
+              disabled={uploading || previews.length === 0}
+              className="rounded bg-sage px-5 py-2 text-sm font-medium text-white disabled:opacity-40 hover:opacity-90"
             >
-              {uploading ? "Importing…" : "Import"}
+              {uploading ? (
+                <span className="flex items-center gap-2">
+                  <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  Importing…
+                </span>
+              ) : (
+                "Import"
+              )}
             </button>
           </div>
 
@@ -179,24 +234,29 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
         </div>
       ))}
 
+      {/* Cumulative import results */}
       {results.length > 0 && (
         <div className="rounded border border-sage/30 bg-sage/5 p-4">
           <p className="text-sm font-medium text-sage">
-            Imported {totalImported} transactions
+            ✓ Imported {totalImported} transaction{totalImported !== 1 ? "s" : ""} from {results.length} file{results.length !== 1 ? "s" : ""}
+            {totalErrors > 0 && (
+              <span className="text-brass"> — {totalErrors} warning{totalErrors !== 1 ? "s" : ""}</span>
+            )}
           </p>
           {results.flatMap((r) => r.errors as ImportError[]).map((err: ImportError, i: number) => (
-            <p key={i} className="text-xs text-brass mt-1">⚠ {err.message}</p>
+            <p key={i} className="text-xs text-brass mt-1">⚠ Row {err.row}: {err.message}</p>
           ))}
         </div>
       )}
 
-      <div className="flex justify-end border-t border-line pt-4">
+      {/* Continue button */}
+      <div ref={continueRef} className="flex justify-end border-t border-line pt-4">
         <button
           onClick={onComplete}
           disabled={results.length === 0}
-          className="rounded bg-ink px-6 py-2.5 text-sm text-white disabled:opacity-40"
+          className="rounded bg-ink px-8 py-3 text-sm font-medium text-white disabled:opacity-40 hover:opacity-90"
         >
-          {results.length === 0 ? "Upload at least one statement" : "Continue to Review"}
+          {results.length === 0 ? "Upload and import at least one statement" : `Continue to Review (${totalImported} transactions)`}
         </button>
       </div>
     </div>

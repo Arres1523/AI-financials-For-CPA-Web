@@ -27,7 +27,13 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const db = getDb();
-  const { companyId, accountName, bankName, lastFour, accountType, openingBalance, closingBalance } = await request.json();
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  const { companyId, accountName, bankName, lastFour, accountType, openingBalance, closingBalance } = body;
   if (!companyId || !accountName || !bankName || !lastFour) {
     return NextResponse.json({ error: "companyId, accountName, bankName, lastFour are required" }, { status: 400 });
   }

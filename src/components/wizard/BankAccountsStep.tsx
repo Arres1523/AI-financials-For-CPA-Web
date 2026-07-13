@@ -13,7 +13,8 @@ export default function BankAccountsStep({ company, onComplete }: Props) {
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({ accountName: "", bankName: "", lastFour: "", accountType: "Checking" });
+  const [form, setForm] = useState({ accountName: "", bankName: "", lastFour: "", accountType: "Checking", openingBalance: "", closingBalance: "" });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   useEffect(() => { loadAccounts(); }, []);
 
@@ -23,28 +24,40 @@ export default function BankAccountsStep({ company, onComplete }: Props) {
   }
 
   async function saveAccount() {
-    if (!form.accountName || !form.bankName || form.lastFour.length !== 4) return;
+    const errors: Record<string, string> = {};
+    if (!form.accountName) errors.accountName = "Required";
+    if (!form.bankName) errors.bankName = "Required";
+    if (form.lastFour.length !== 4) errors.lastFour = "Must be exactly 4 digits";
+    const ob = form.openingBalance === "" ? 0 : parseFloat(form.openingBalance);
+    const cb = form.closingBalance === "" ? 0 : parseFloat(form.closingBalance);
+    if (isNaN(ob)) errors.openingBalance = "Must be a number";
+    if (isNaN(cb)) errors.closingBalance = "Must be a number";
+    setFormErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
+    const body = { accountName: form.accountName, bankName: form.bankName, lastFour: form.lastFour, accountType: form.accountType, openingBalance: ob, closingBalance: cb, companyId: company.id };
     if (editId) {
       await fetch(`/api/accounts/${editId}`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...form, companyId: company.id }),
+        body: JSON.stringify(body),
       });
     } else {
       await fetch("/api/accounts", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...form, companyId: company.id }),
+        body: JSON.stringify(body),
       });
     }
-    setForm({ accountName: "", bankName: "", lastFour: "", accountType: "Checking" });
+    setForm({ accountName: "", bankName: "", lastFour: "", accountType: "Checking", openingBalance: "", closingBalance: "" });
+    setFormErrors({});
     setShowForm(false);
     setEditId(null);
     await loadAccounts();
   }
 
   function startEdit(a: BankAccount) {
-    setForm({ accountName: a.accountName, bankName: a.bankName, lastFour: a.lastFour, accountType: a.accountType });
+    setForm({ accountName: a.accountName, bankName: a.bankName, lastFour: a.lastFour, accountType: a.accountType, openingBalance: String(a.openingBalance || ""), closingBalance: String(a.closingBalance || "") });
     setEditId(a.id);
     setShowForm(true);
   }
@@ -68,6 +81,9 @@ export default function BankAccountsStep({ company, onComplete }: Props) {
               <p className="font-medium">{a.accountName}</p>
               <p className="text-xs text-slate-500">
                 {a.bankName} •••• {a.lastFour} · {a.accountType}
+              </p>
+              <p className="text-xs text-slate-400">
+                Op: ${a.openingBalance?.toLocaleString() ?? "0"} · Cl: ${a.closingBalance?.toLocaleString() ?? "0"}
               </p>
             </div>
             <div className="flex gap-2">
@@ -102,12 +118,22 @@ export default function BankAccountsStep({ company, onComplete }: Props) {
                 <option>Money Market</option>
               </select>
             </label>
+            <label className="grid gap-1 text-sm">
+              Opening balance ($)
+              <input className="rounded border border-line px-3 py-2" type="number" step="0.01" value={form.openingBalance} onChange={(e) => setForm({ ...form, openingBalance: e.target.value })} />
+              {formErrors.openingBalance && <span className="text-xs text-red-600">{formErrors.openingBalance}</span>}
+            </label>
+            <label className="grid gap-1 text-sm">
+              Closing balance ($)
+              <input className="rounded border border-line px-3 py-2" type="number" step="0.01" value={form.closingBalance} onChange={(e) => setForm({ ...form, closingBalance: e.target.value })} />
+              {formErrors.closingBalance && <span className="text-xs text-red-600">{formErrors.closingBalance}</span>}
+            </label>
           </div>
           <div className="flex gap-2">
             <button onClick={saveAccount} className="rounded bg-ink px-4 py-2 text-sm text-white">
               {editId ? "Save changes" : "Add account"}
             </button>
-            <button onClick={() => { setShowForm(false); setEditId(null); }} className="rounded border border-line px-4 py-2 text-sm">
+            <button onClick={() => { setShowForm(false); setEditId(null); setFormErrors({}); }} className="rounded border border-line px-4 py-2 text-sm">
               Cancel
             </button>
           </div>

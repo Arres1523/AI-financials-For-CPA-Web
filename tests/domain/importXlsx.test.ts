@@ -28,11 +28,13 @@ describe("importXlsx", () => {
       expect(preview.confidence).toBe("high");
     });
 
-    it("detects multi-sheet files", () => {
+    it("shows warning for multi-sheet files", () => {
       const preview = buildPreview(readFixture("multisheet_sample.xlsx"), "multisheet_sample.xlsx");
       expect(preview.totalRows).toBe(2);
       expect(preview.sheetName).toBe("Jan 2026");
       expect(preview.columns).toContain("Transaction Date");
+      expect(preview.errors.some((e) => e.includes("Only the first sheet"))).toBe(true);
+      expect(preview.errors.some((e) => e.includes("will be ignored"))).toBe(true);
     });
 
     it("reports empty files", () => {
@@ -73,7 +75,7 @@ describe("importXlsx", () => {
       expect(rows[0].amount).toBe(-45);
     });
 
-    it("filters rows outside fiscal year", () => {
+    it("rejects rows outside fiscal year", () => {
       const { rows, errors } = importRows(
         readFixture("chase_sample.xlsx"),
         "chase_sample.xlsx",
@@ -84,6 +86,34 @@ describe("importXlsx", () => {
       );
       expect(rows.length).toBe(0);
       expect(errors.some((e) => e.type === "outside_fiscal_year")).toBe(true);
+    });
+
+    it("rejects taxYear+1 dates", () => {
+      const { rows, errors } = importRows(
+        readFixture("chase_sample.xlsx"),
+        "chase_sample.xlsx",
+        { date: "Date", description: "Description", amount: "Amount" },
+        "ws-1",
+        "ba-1",
+        2025
+      );
+      expect(rows.length).toBe(0);
+      expect(errors.some((e) => e.type === "outside_fiscal_year")).toBe(true);
+    });
+
+    it("imports only first sheet from multi-sheet file", () => {
+      const { rows, errors } = importRows(
+        readFixture("multisheet_sample.xlsx"),
+        "multisheet_sample.xlsx",
+        { date: "Transaction Date", description: "Memo", debit: "Withdrawal", credit: "Deposit" },
+        "ws-1",
+        "ba-1",
+        2026
+      );
+      expect(rows.length).toBe(2);
+      expect(errors.some((e) => e.message.includes("Only the first sheet"))).toBe(true);
+      expect(rows[0].description).toBe("Property Management Fee");
+      expect(rows[0].amount).toBe(-1500);
     });
   });
 });

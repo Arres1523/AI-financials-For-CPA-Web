@@ -2,18 +2,37 @@ import { NextResponse } from "next/server";
 import { getDb } from "@/lib/db";
 import { buildReportsFromClassifications } from "@/domain/reporting";
 import { buildWorkbookBuffer } from "@/exports/workbook";
+import { v4 as uuid } from "uuid";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const body = await request.json() as {
-    workspaceId: string;
-    companyName: string;
-    taxYear: number;
-    includeTransactions: boolean;
-  };
+  let body: { workspaceId: string; includeTransactions: boolean };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  if (!body.workspaceId) {
+    return NextResponse.json({ error: "workspaceId required" }, { status: 400 });
+  }
 
   const db = getDb();
+
+  // Derive company name and tax year from workspace
+  const ws = db.prepare(`
+    SELECT w.*, c.legal_name FROM workspaces w
+    JOIN companies c ON c.id = w.company_id
+    WHERE w.id = ?
+  `).get(body.workspaceId) as any;
+
+  if (!ws) {
+    return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
+  }
+
+  const companyName = ws.legal_name;
+  const taxYear = ws.tax_year;
 
   const txRows = db.prepare(`
     SELECT t.*, c.final_category, c.report_type, c.confidence, c.rule_used, c.review_status
@@ -23,7 +42,7 @@ export async function POST(request: Request) {
     ORDER BY t.date ASC, t.original_row_index ASC
   `).all(body.workspaceId) as any[];
 
-  const transactions = txRows.map((r) => ({
+  const transactions = txRows.map((r: any) => ({
     id: r.id,
     workspaceId: r.workspace_id,
     bankAccountId: r.bank_account_id,
@@ -36,7 +55,7 @@ export async function POST(request: Request) {
     createdAt: r.created_at,
   }));
 
-  const classifications = txRows.map((r) => ({
+  const classifications = txRows.map((r: any) => ({
     id: r.id,
     transactionId: r.id,
     finalCategory: r.final_category,
@@ -49,14 +68,14 @@ export async function POST(request: Request) {
     updatedAt: r.created_at,
   }));
 
-  const joined = transactions.map((t, i) => ({
+  const joined = transactions.map((t: any, i: number) => ({
     transaction: t,
     classification: classifications[i],
   }));
 
-  const reports = buildReportsFromClassifications(body.companyName, body.taxYear, joined);
+  const reports = buildReportsFromClassifications(companyName, taxYear, joined);
 
-  const flaggedTransactions = transactions.filter((_, i) =>
+  const flaggedTransactions = transactions.filter((_: any, i: number) =>
     classifications[i]?.reviewStatus === "pending" ||
     classifications[i]?.confidence === "low"
   );
@@ -71,23 +90,29 @@ export async function POST(request: Request) {
   `).all(body.workspaceId, body.workspaceId) as any[];
 
   const buffer = await buildWorkbookBuffer({
-    companyName: body.companyName,
-    taxYear: body.taxYear,
+    companyName,
+    taxYear,
     transactions,
     classifications,
     reports,
     flaggedTransactions,
     accountReconData,
-    includeTransactions: body.includeTransactions,
+    includeTransactions: body.includeTransactions ?? false,
   });
 
+  // Register export
+  db.prepare("INSERT INTO report_exports (id, workspace_id, export_type) VALUES (?, ?, ?)").run(
+    uuid(), body.workspaceId, body.includeTransactions ? "with_transactions" : "financial_only"
+  );
+
+  // Do NOT mark workspace as completed — exports are preliminary drafts
   const responseBody = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
   const suffix = body.includeTransactions ? "_with_transactions" : "";
 
   return new NextResponse(responseBody, {
     headers: {
       "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "content-disposition": `attachment; filename="${body.companyName.replace(/\s+/g, "_")}_${body.taxYear}_Financial_Statements${suffix}.xlsx`
-    }
+      "content-disposition": `attachment; filename="${companyName.replace(/\s+/g, "_")}_${taxYear}_Financial_Statements${suffix}.xlsx`
+    },
   });
 }

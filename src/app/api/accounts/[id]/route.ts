@@ -6,7 +6,20 @@ export const runtime = "nodejs";
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const db = getDb();
-  const { accountName, bankName, lastFour, accountType, openingBalance, closingBalance } = await request.json();
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  const { accountName, bankName, lastFour, accountType, openingBalance, closingBalance } = body;
+  if (!accountName || !bankName || !lastFour) {
+    return NextResponse.json({ error: "accountName, bankName, lastFour are required" }, { status: 400 });
+  }
+  const existing = db.prepare("SELECT id FROM bank_accounts WHERE id = ?").get(id);
+  if (!existing) {
+    return NextResponse.json({ error: "Account not found" }, { status: 404 });
+  }
   db.prepare(
     "UPDATE bank_accounts SET account_name = ?, bank_name = ?, last_four = ?, account_type = ?, opening_balance = ?, closing_balance = ? WHERE id = ?"
   ).run(accountName, bankName, lastFour, accountType, openingBalance ?? 0, closingBalance ?? 0, id);

@@ -6,3 +6,10 @@ out
 *.log
 tsconfig.tsbuildinfo
 .env*
+data/*.db
+data/*.db-wal
+data/*.db-shm
+playwright-report/
+test-results/
+blob-report/
+.playwright/

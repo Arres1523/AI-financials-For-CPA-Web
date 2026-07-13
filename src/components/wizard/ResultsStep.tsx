@@ -19,6 +19,7 @@ function money(val: number): string {
 
 export default function ResultsStep({ workspace, company, accounts, reconciliation, onNewWorkflow }: Props) {
   const [transactions, setTransactions] = useState<TransactionWithClassification[]>([]);
+  const [statementCount, setStatementCount] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [exportType, setExportType] = useState<"financial" | "withTransactions">("financial");
 
@@ -26,6 +27,10 @@ export default function ResultsStep({ workspace, company, accounts, reconciliati
     fetch(`/api/transactions?workspaceId=${workspace.id}`)
       .then((r) => r.json())
       .then(setTransactions);
+    fetch(`/api/statements?workspaceId=${workspace.id}`)
+      .then((r) => r.json())
+      .then((data) => setStatementCount(Array.isArray(data) ? data.length : 0))
+      .catch(() => {});
   }, [workspace.id]);
 
   const reports = buildReports(company.legalName, workspace.taxYear, transactions);
@@ -73,10 +78,10 @@ export default function ResultsStep({ workspace, company, accounts, reconciliati
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="rounded border border-line p-3">
           <p className="text-xs text-slate-500">Statements imported</p>
-          <p className="text-2xl font-semibold">{totalImported > 0 ? "✓" : "—"}</p>
+          <p className="text-2xl font-semibold">{statementCount || (totalImported > 0 ? "✓" : "—")}</p>
         </div>
         <div className="rounded border border-line p-3">
-          <p className="text-xs text-slate-500">Total transactions</p>
+          <p className="text-xs text-slate-500">Transactions imported</p>
           <p className="text-2xl font-semibold">{totalImported}</p>
         </div>
         <div className="rounded border border-line p-3">
@@ -90,6 +95,15 @@ export default function ResultsStep({ workspace, company, accounts, reconciliati
           </p>
         </div>
       </div>
+
+      {reconciliation.filter(r => r.status === "reconciled").length > 0 && (
+        <div className="rounded border border-sage/30 bg-sage/5 p-3 text-sm text-sage">
+          ✓ {reconciliation.filter(r => r.status === "reconciled").length} account(s) reconciled
+          {reconciliation.some(r => r.status === "unreconciled") && (
+            <span className="text-brass"> · {reconciliation.filter(r => r.status === "unreconciled").length} unreconciled</span>
+          )}
+        </div>
+      )}
 
       {/* Alerts */}
       {hasWarnings && (
@@ -130,7 +144,8 @@ export default function ResultsStep({ workspace, company, accounts, reconciliati
 
       {/* BS Preview */}
       <div className="rounded border border-line p-4">
-        <h3 className="mb-2 text-sm font-semibold">Balance Sheet Preview — {workspace.taxYear}</h3>
+        <h3 className="mb-2 text-sm font-semibold">Preliminary Balance Sheet from Bank Activity — {workspace.taxYear}</h3>
+        <p className="mb-3 text-xs text-brass">This preliminary report is based on classified bank activity and does not represent actual period-end account balances. Only imported bank movements are included.</p>
         <div className="grid grid-cols-[1fr_auto] gap-x-8 gap-y-1 text-sm">
           <span className="col-span-2 mt-1 font-medium capitalize text-slate-600">Assets</span>
           <span className="col-span-2 mt-1 font-medium capitalize text-slate-600">Liabilities</span>

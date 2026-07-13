@@ -6,10 +6,20 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   const db = getDb();
-  const { transactionIds, action, newCategory } = await request.json();
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  const { transactionIds, action, newCategory } = body;
 
   if (!transactionIds || !Array.isArray(transactionIds) || transactionIds.length === 0) {
     return NextResponse.json({ error: "transactionIds array required" }, { status: 400 });
+  }
+
+  if (!["approve", "exclude"].includes(action) && !newCategory) {
+    return NextResponse.json({ error: "action must be 'approve' or 'exclude', or provide newCategory" }, { status: 400 });
   }
 
   const txn = db.transaction(() => {

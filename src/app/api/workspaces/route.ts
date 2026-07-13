@@ -28,7 +28,13 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const db = getDb();
-  const { companyId, taxYear } = await request.json();
+  let body: any;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  const { companyId, taxYear } = body;
   if (!companyId || !taxYear) {
     return NextResponse.json({ error: "companyId and taxYear are required" }, { status: 400 });
   }

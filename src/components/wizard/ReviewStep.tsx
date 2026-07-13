@@ -17,19 +17,32 @@ type Props = {
 
 export default function ReviewStep({ workspace, onComplete, onBack }: Props) {
   const [items, setItems] = useState<TransactionWithClassification[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"exceptions" | "all">("exceptions");
   const [filter, setFilter] = useState("");
 
-  const load = useCallback(async () => {
+  const loadCounts = useCallback(async () => {
+    const res = await fetch(`/api/transactions?workspaceId=${workspace.id}`);
+    if (res.ok) {
+      const all = await res.json();
+      setTotalCount(all.length);
+    }
+  }, [workspace.id]);
+
+  const load = useCallback(async (all?: boolean) => {
     setLoading(true);
-    const res = await fetch(`/api/transactions?workspaceId=${workspace.id}&needsReview=true`);
+    const url = `/api/transactions?workspaceId=${workspace.id}${all ? "" : "&needsReview=true"}`;
+    const res = await fetch(url);
     if (res.ok) setItems(await res.json());
     setLoading(false);
   }, [workspace.id]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load(activeTab === "all");
+    loadCounts();
+  }, [load, loadCounts, activeTab]);
 
   async function handleAction(action: "approve" | "exclude", transactionIds: string[], newCategory?: string) {
     await fetch("/api/classifications", {
@@ -74,7 +87,20 @@ export default function ReviewStep({ workspace, onComplete, onBack }: Props) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold">Review Exceptions</h2>
-        <span className="text-sm text-brass">{pendingCount} pending review</span>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setActiveTab("exceptions")}
+            className={`text-sm px-3 py-1 rounded ${activeTab === "exceptions" ? "bg-ink text-white" : "text-slate-500 hover:text-ink"}`}
+          >
+            Exceptions {pendingCount > 0 ? `(${pendingCount})` : ""}
+          </button>
+          <button
+            onClick={() => setActiveTab("all")}
+            className={`text-sm px-3 py-1 rounded ${activeTab === "all" ? "bg-ink text-white" : "text-slate-500 hover:text-ink"}`}
+          >
+            All Transactions ({totalCount})
+          </button>
+        </div>
       </div>
 
       {allResolved && items.length === 0 ? (
@@ -140,7 +166,7 @@ export default function ReviewStep({ workspace, onComplete, onBack }: Props) {
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap">{t.date}</td>
                       <td className="px-3 py-2 max-w-[280px] truncate" title={t.description}>{t.description}</td>
-                      <td className="px-3 py-2 money">${Math.abs(t.amount).toFixed(2)}</td>
+                      <td className={`px-3 py-2 money ${t.amount < 0 ? "text-red-600" : "text-sage"}`}>${t.amount.toFixed(2)}</td>
                       <td className="px-3 py-2">
                         <select
                           className="rounded border border-line px-2 py-1 text-xs max-w-[160px]"

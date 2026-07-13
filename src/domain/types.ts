@@ -143,7 +143,7 @@ export type ReportPackage = {
 export type ColumnMapping = {
   date: string;
   description: string;
-  amount: string;
+  amount?: string;
   debit?: string;
   credit?: string;
   balance?: string;

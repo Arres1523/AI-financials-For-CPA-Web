@@ -1,4 +1,4 @@
-import type { ClassifiedTransaction, CpaMemoModel, CpaPackage, CpaPackageStatus } from "./types";
+import type { CpaMemoModel, CpaPackage, CpaPackageStatus, TransactionWithClassification } from "./types";
 
 export function buildCpaPackageStatus(pkg: CpaPackage): CpaPackageStatus {
   const blockers: string[] = [];
@@ -18,14 +18,14 @@ export function buildCpaPackageStatus(pkg: CpaPackage): CpaPackageStatus {
   };
 }
 
-export function buildMemoModel(pkg: CpaPackage, classifications: ClassifiedTransaction[]): CpaMemoModel {
+export function buildMemoModel(pkg: CpaPackage, classifications: TransactionWithClassification[]): CpaMemoModel {
   const missingDocuments = pkg.checklist
     .filter((item) => item.status === "Missing" || item.status === "Listed in CPA memo")
     .map((item) => item.memoNote.trim() || item.label);
 
   const openReviewItems = classifications
-    .filter((row) => row.reviewStatus)
-    .map((row) => `${row.date} - ${row.description}: ${row.reviewStatus}`);
+    .filter((row) => row.classification?.reviewStatus === "pending")
+    .map((row) => `${row.date} - ${row.description}: ${row.classification?.finalCategory}`);
 
   if (Math.abs(pkg.balanceCheck ?? 0) > 0.01 && pkg.balanceCheckExplanation.trim()) {
     openReviewItems.push(`Balance Check delta: ${pkg.balanceCheckExplanation}`);

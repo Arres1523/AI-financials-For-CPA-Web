@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { buildMemoModel } from "../../../../domain/cpaPackage";
-import type { ClassifiedTransaction, CpaPackage } from "../../../../domain/types";
+import type { CpaPackage, TransactionWithClassification } from "../../../../domain/types";
 import { buildCpaMemoBuffer } from "../../../../exports/cpaMemo";
 
 export const runtime = "nodejs";
@@ -8,12 +8,11 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   const body = (await request.json()) as {
     pkg: CpaPackage;
-    transactions: ClassifiedTransaction[];
+    transactions: TransactionWithClassification[];
   };
   const model = buildMemoModel(body.pkg, body.transactions);
   const buffer = await buildCpaMemoBuffer(model);
   const responseBody = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer;
-
   return new NextResponse(responseBody, {
     headers: {
       "content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",

@@ -1,51 +1,54 @@
 import { describe, expect, it } from "vitest";
 import { buildReports } from "../../src/domain/reporting";
+import type { TransactionWithClassification } from "../../src/domain/types";
 
 describe("buildReports", () => {
+  function make(
+    id: string,
+    description: string,
+    amount: number,
+    category: string,
+    reportType: "P&L" | "Balance Sheet"
+  ): TransactionWithClassification {
+    return {
+      id,
+      workspaceId: "ws-1",
+      bankAccountId: "ba-1",
+      statementId: "st-1",
+      date: "2025-01-01",
+      description,
+      amount,
+      balance: null,
+      originalRowIndex: 0,
+      createdAt: "2025-01-01T00:00:00.000Z",
+      classification: {
+        id: `c-${id}`,
+        transactionId: id,
+        finalCategory: category,
+        reportType,
+        confidence: "high" as const,
+        ruleUsed: "test",
+        reviewStatus: "approved" as const,
+        isManualCorrection: false,
+        createdAt: "2025-01-01T00:00:00.000Z",
+        updatedAt: "2025-01-01T00:00:00.000Z",
+      },
+    };
+  }
+
   it("keeps balance-sheet activity out of P&L", () => {
     const reports = buildReports("Demo LLC", 2025, [
-      {
-        id: "1",
-        transactionId: "1",
-        date: "2025-01-01",
-        sourceAccount: "Bank",
-        description: "Rent",
-        amount: 1000,
-        sourceCategory: "",
-        type: "",
-        sourceBalance: null,
-        sourceFile: "jan.csv",
-        finalCategory: "Rental Income",
-        statement: "P&L",
-        pnlLine: "Rental Income",
-        pnlAmount: 1000,
-        bsLine: "",
-        bsCounterpartAmount: 0,
-        reviewStatus: "",
-        source: "rule"
-      },
-      {
-        id: "2",
-        transactionId: "2",
-        date: "2025-01-02",
-        sourceAccount: "Bank",
-        description: "Contribution",
-        amount: 5000,
-        sourceCategory: "",
-        type: "",
-        sourceBalance: null,
-        sourceFile: "jan.csv",
-        finalCategory: "Capital contributions",
-        statement: "Balance Sheet",
-        pnlLine: "",
-        pnlAmount: 0,
-        bsLine: "Capital contributions",
-        bsCounterpartAmount: 5000,
-        reviewStatus: "",
-        source: "rule"
-      }
+      make("1", "Rent", 1000, "Rental Income", "P&L"),
+      make("2", "Contribution", 5000, "Owner Contributions", "Balance Sheet"),
     ]);
     expect(reports.pnl.netIncome).toBe(1000);
-    expect(reports.balanceSheet.equity["Capital contributions"]).toBe(5000);
+    expect(reports.balanceSheet.equity["Owner Contributions"]).toBe(5000);
+  });
+
+  it("shows balance check when BS doesn't balance", () => {
+    const reports = buildReports("Demo LLC", 2025, [
+      make("1", "Income", 1000, "Rental Income", "P&L"),
+    ]);
+    expect(reports.balanceSheet.balanceCheck).not.toBe(0);
   });
 });

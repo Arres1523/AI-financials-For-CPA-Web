@@ -1,160 +1,215 @@
 import ExcelJS from "exceljs";
-import type { ClassifiedTransaction, ReportPackage } from "../domain/types";
+import type { Classification, PnlReport, BalanceSheetReport, Transaction } from "../domain/types";
+import { reconcileAccountPeriod } from "../domain/reconciliation";
 
-export type WorkbookExportInput = {
-  entityName: string;
-  taxYear: number;
-  transactions: ClassifiedTransaction[];
-  reports: Pick<ReportPackage, "pnl" | "balanceSheet">;
-};
-
-const currencyFormat = "$#,##0.00;($#,##0.00);-";
+const fmt = "$#,##0.00;($#,##0.00);-";
 
 function bold(cell: ExcelJS.Cell) {
-  cell.font = { bold: true };
+  cell.font = { bold: true, size: 11 };
 }
+
+function headerRow(cell: ExcelJS.Cell, text: string) {
+  cell.value = text;
+  cell.font = { bold: true, size: 12 };
+}
+
+export type WorkbookExportInput = {
+  companyName: string;
+  taxYear: number;
+  transactions: Transaction[];
+  classifications: Classification[];
+  reports: { pnl: PnlReport; balanceSheet: BalanceSheetReport };
+  flaggedTransactions: Transaction[];
+  accountReconData: { id: string; account_name: string; opening_balance: number; closing_balance: number; movement_total: number }[];
+  includeTransactions: boolean;
+};
 
 export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = "Valoris CPA Package";
+  workbook.creator = "AI Financials for CPA Web";
   workbook.created = new Date();
+  const genDate = new Date().toISOString().slice(0, 10);
 
-  const detail = workbook.addWorksheet("Transaction Detail");
-  detail.columns = [
-    { header: "Date", key: "date", width: 14 },
-    { header: "Source Account", key: "sourceAccount", width: 24 },
-    { header: "Description", key: "description", width: 42 },
-    { header: "Amount", key: "amount", width: 14 },
-    { header: "Source Category", key: "sourceCategory", width: 20 },
-    { header: "Final Category", key: "finalCategory", width: 26 },
-    { header: "Statement", key: "statement", width: 16 },
-    { header: "P&L Line", key: "pnlLine", width: 24 },
-    { header: "P&L Amount", key: "pnlAmount", width: 14 },
-    { header: "BS Line", key: "bsLine", width: 28 },
-    { header: "BS Counterpart Amount", key: "bsCounterpartAmount", width: 20 },
-    { header: "Type", key: "type", width: 16 },
-    { header: "Source Balance", key: "sourceBalance", width: 16 },
-    { header: "Review Status", key: "reviewStatus", width: 26 }
-  ];
-  detail.views = [{ state: "frozen", ySplit: 1 }];
-  detail.getRow(1).font = { bold: true };
-
-  input.transactions.forEach((row) => {
-    const excelRow = detail.addRow({
-      date: row.date,
-      sourceAccount: row.sourceAccount,
-      description: row.description,
-      amount: row.amount,
-      sourceCategory: row.sourceCategory,
-      finalCategory: row.finalCategory,
-      statement: row.statement,
-      pnlLine: row.pnlLine,
-      pnlAmount: 0,
-      bsLine: row.bsLine,
-      bsCounterpartAmount: 0,
-      type: row.type,
-      sourceBalance: row.sourceBalance,
-      reviewStatus: row.reviewStatus
-    });
-    excelRow.getCell("I").value = row.statement === "P&L" ? { formula: `D${excelRow.number}` } : { formula: "0" };
-    excelRow.getCell("K").value =
-      row.statement === "Balance Sheet" ? { formula: `D${excelRow.number}` } : { formula: "0" };
-    excelRow.getCell("D").numFmt = currencyFormat;
-    excelRow.getCell("I").numFmt = currencyFormat;
-    excelRow.getCell("K").numFmt = currencyFormat;
-    excelRow.getCell("M").numFmt = currencyFormat;
-  });
-
-  const firstDataRow = 2;
-  const lastDataRow = Math.max(input.transactions.length + 1, 2);
-
+  // ─── P&L Sheet ──────────────────────────────────────────────
   const pnl = workbook.addWorksheet(`P&L ${input.taxYear}`, { views: [{ showGridLines: false }] });
-  pnl.addRow([input.entityName]);
-  pnl.addRow(["Profit and Loss"]);
-  pnl.addRow([`For the year ended December 31, ${input.taxYear}`]);
+  pnl.columns = [{ width: 36 }, { width: 18 }];
+
+  headerRow(pnl.getCell("A1"), input.companyName);
+  pnl.mergeCells("A1:B1");
+  pnl.getCell("A2").value = `Profit & Loss — For the year ended December 31, ${input.taxYear}`;
+  pnl.mergeCells("A2:B2");
+  pnl.getCell("A3").value = `Generated: ${genDate}`;
+  pnl.mergeCells("A3:B3");
+
+  const hasWarnings = input.flaggedTransactions.length > 0 ||
+    Math.abs(input.reports.balanceSheet.balanceCheck) > 0.01;
+
+  if (hasWarnings) {
+    pnl.getCell("A4").value = "⚠ PRELIMINARY — See footnotes. Does not substitute CPA review.";
+    pnl.getCell("A4").font = { bold: true, color: { argb: "CC5500" } };
+    pnl.mergeCells("A4:B4");
+  }
+
   pnl.addRow([]);
   pnl.addRow(["Category", "Amount"]);
-  pnl.getRow(1).font = { bold: true };
-  pnl.getRow(2).font = { bold: true };
-  pnl.getRow(5).font = { bold: true };
-  pnl.columns = [{ width: 34 }, { width: 16 }];
+  bold(pnl.getCell("A5"));
+  bold(pnl.getCell("B5"));
 
-  pnl.addRow(["Income"]);
-  bold(pnl.getCell("A6"));
-  for (const line of Object.keys(input.reports.pnl.income)) {
-    const row = pnl.addRow([line, { formula: `SUMIFS('Transaction Detail'!$I$${firstDataRow}:$I$${lastDataRow},'Transaction Detail'!$H$${firstDataRow}:$H$${lastDataRow},A${pnl.rowCount})` }]);
-    row.getCell(2).numFmt = currencyFormat;
+  const dataStart = 6;
+
+  // Income section
+  pnl.addRow(["INCOME"]);
+  bold(pnl.getCell(`A${pnl.rowCount}`));
+  const firstIncome = pnl.rowCount + 1;
+  for (const [line, _amount] of Object.entries(input.reports.pnl.income)) {
+    pnl.addRow([line, 0]);
+    pnl.getCell(`B${pnl.rowCount}`).numFmt = fmt;
   }
+  const lastIncome = pnl.rowCount;
   const totalIncomeRow = pnl.rowCount + 1;
-  pnl.addRow(["Total Income", { formula: `SUM(B7:B${Math.max(totalIncomeRow - 1, 7)})` }]);
+  pnl.addRow(["Total Income", { formula: `SUM(B${firstIncome}:B${lastIncome})` }]);
   bold(pnl.getCell(`A${totalIncomeRow}`));
-  pnl.getCell(`B${totalIncomeRow}`).numFmt = currencyFormat;
+  pnl.getCell(`B${totalIncomeRow}`).numFmt = fmt;
 
+  // Expenses section
   pnl.addRow([]);
-  const expensesHeader = pnl.rowCount + 1;
-  pnl.addRow(["Expenses"]);
-  bold(pnl.getCell(`A${expensesHeader}`));
-  const firstExpenseRow = pnl.rowCount + 1;
-  for (const line of Object.keys(input.reports.pnl.expenses)) {
-    const row = pnl.addRow([line, { formula: `-SUMIFS('Transaction Detail'!$I$${firstDataRow}:$I$${lastDataRow},'Transaction Detail'!$H$${firstDataRow}:$H$${lastDataRow},A${pnl.rowCount})` }]);
-    row.getCell(2).numFmt = currencyFormat;
+  pnl.addRow(["EXPENSES"]);
+  bold(pnl.getCell(`A${pnl.rowCount}`));
+  const firstExpense = pnl.rowCount + 1;
+  for (const [line, _amount] of Object.entries(input.reports.pnl.expenses)) {
+    pnl.addRow([line, 0]);
+    pnl.getCell(`B${pnl.rowCount}`).numFmt = fmt;
   }
-  const totalExpensesRow = pnl.rowCount + 1;
-  pnl.addRow(["Total Expenses", { formula: `SUM(B${firstExpenseRow}:B${Math.max(totalExpensesRow - 1, firstExpenseRow)})` }]);
-  bold(pnl.getCell(`A${totalExpensesRow}`));
-  pnl.getCell(`B${totalExpensesRow}`).numFmt = currencyFormat;
+  const lastExpense = pnl.rowCount;
+  const totalExpenseRow = pnl.rowCount + 1;
+  pnl.addRow(["Total Expenses", { formula: `SUM(B${firstExpense}:B${lastExpense})` }]);
+  bold(pnl.getCell(`A${totalExpenseRow}`));
+  pnl.getCell(`B${totalExpenseRow}`).numFmt = fmt;
 
+  // Net income
   pnl.addRow([]);
-  const netIncomeRow = pnl.rowCount + 1;
-  pnl.addRow(["Net Income (Loss)", { formula: `B${totalIncomeRow}-B${totalExpensesRow}` }]);
-  bold(pnl.getCell(`A${netIncomeRow}`));
-  pnl.getCell(`B${netIncomeRow}`).numFmt = currencyFormat;
+  const niRow = pnl.rowCount + 1;
+  pnl.addRow(["Net Income (Loss)", { formula: `B${totalIncomeRow}-B${totalExpenseRow}` }]);
+  bold(pnl.getCell(`A${niRow}`));
+  pnl.getCell(`B${niRow}`).numFmt = fmt;
+  pnl.getCell(`B${niRow}`).font = { bold: true, italic: true };
 
+  // ─── Balance Sheet ──────────────────────────────────────────
   const bs = workbook.addWorksheet("Balance Sheet", { views: [{ showGridLines: false }] });
-  bs.columns = [{ width: 38 }, { width: 16 }];
-  bs.addRow([input.entityName]);
-  bs.addRow(["Balance Sheet"]);
-  bs.addRow([`As of December 31, ${input.taxYear}`]);
+  bs.columns = [{ width: 38 }, { width: 18 }];
+
+  headerRow(bs.getCell("A1"), input.companyName);
+  bs.mergeCells("A1:B1");
+  bs.getCell("A2").value = `Balance Sheet — As of December 31, ${input.taxYear}`;
+  bs.mergeCells("A2:B2");
+  bs.getCell("A3").value = `Generated: ${genDate}`;
+  bs.mergeCells("A3:B3");
+
+  if (hasWarnings) {
+    bs.getCell("A4").value = "⚠ PRELIMINARY — See footnotes. Does not substitute CPA review.";
+    bs.getCell("A4").font = { bold: true, color: { argb: "CC5500" } };
+    bs.mergeCells("A4:B4");
+  }
+
   bs.addRow([]);
   bs.addRow(["Category", "Amount"]);
-  bs.getRow(1).font = { bold: true };
-  bs.getRow(2).font = { bold: true };
-  bs.getRow(5).font = { bold: true };
+  bold(bs.getCell("A6"));
+  bold(bs.getCell("B6"));
 
-  const sections = [
-    ["Assets", input.reports.balanceSheet.assets],
-    ["Liabilities", input.reports.balanceSheet.liabilities],
-    ["Equity", input.reports.balanceSheet.equity]
-  ] as const;
+  const bsDataStart = 7;
+  let currentRow = bsDataStart;
 
-  const totalRows: Record<string, number> = {};
-  for (const [section, lines] of sections) {
-    bs.addRow([]);
-    const headerRow = bs.rowCount + 1;
-    bs.addRow([section]);
-    bold(bs.getCell(`A${headerRow}`));
-    const firstLine = bs.rowCount + 1;
+  const writeSection = (label: string, lines: Record<string, number>) => {
+    bs.addRow([label.toUpperCase()]);
+    bold(bs.getCell(`A${currentRow}`));
+    currentRow = bs.rowCount + 1;
+    const first = currentRow;
     for (const line of Object.keys(lines)) {
-      const row = bs.addRow([line, { formula: `SUMIFS('Transaction Detail'!$K$${firstDataRow}:$K$${lastDataRow},'Transaction Detail'!$J$${firstDataRow}:$J$${lastDataRow},A${bs.rowCount})` }]);
-      if (line === "Current year net income") row.getCell(2).value = { formula: `'P&L ${input.taxYear}'!B${netIncomeRow}` };
-      row.getCell(2).numFmt = currencyFormat;
+      bs.addRow([line, 0]);
+      bs.getCell(`B${bs.rowCount}`).numFmt = fmt;
     }
-    const totalRow = bs.rowCount + 1;
-    bs.addRow([`Total ${section}`, { formula: `SUM(B${firstLine}:B${Math.max(totalRow - 1, firstLine)})` }]);
-    bold(bs.getCell(`A${totalRow}`));
-    bs.getCell(`B${totalRow}`).numFmt = currencyFormat;
-    totalRows[section] = totalRow;
-  }
+    const last = bs.rowCount;
+    if (last >= first) {
+      bs.addRow([`Total ${label}`, { formula: `SUM(B${first}:B${last})` }]);
+      bold(bs.getCell(`A${bs.rowCount}`));
+      bs.getCell(`B${bs.rowCount}`).numFmt = fmt;
+    }
+    currentRow = bs.rowCount + 1;
+  };
+
+  writeSection("Assets", input.reports.balanceSheet.assets);
+  writeSection("Liabilities", input.reports.balanceSheet.liabilities);
+  writeSection("Equity", input.reports.balanceSheet.equity);
 
   bs.addRow([]);
-  const totalLeRow = bs.rowCount + 1;
-  bs.addRow(["Total Liabilities and Equity", { formula: `B${totalRows.Liabilities}+B${totalRows.Equity}` }]);
-  bold(bs.getCell(`A${totalLeRow}`));
-  bs.getCell(`B${totalLeRow}`).numFmt = currencyFormat;
-  const balanceCheckRow = bs.rowCount + 1;
-  bs.addRow(["Balance Check", { formula: `B${totalRows.Assets}-B${totalLeRow}` }]);
-  bold(bs.getCell(`A${balanceCheckRow}`));
-  bs.getCell(`B${balanceCheckRow}`).numFmt = currencyFormat;
+  const bcRow = bs.rowCount + 1;
+  bs.addRow(["Balance Check (Assets − Liabilities − Equity)", 0]);
+  bold(bs.getCell(`A${bcRow}`));
+  bs.getCell(`B${bcRow}`).numFmt = fmt;
+  bs.getCell(`B${bcRow}`).value = input.reports.balanceSheet.balanceCheck;
+
+  if (Math.abs(input.reports.balanceSheet.balanceCheck) > 0.01) {
+    bs.getCell(`A${bcRow}`).font = { bold: true, color: { argb: "CC0000" } };
+    bs.getCell(`B${bcRow}`).font = { bold: true, color: { argb: "CC0000" } };
+    bs.addRow(["⚠ The Balance Sheet does not balance. Possible missing accounts or data."]);
+    bs.getCell(`A${bs.rowCount}`).font = { italic: true, color: { argb: "CC5500" } };
+    bs.mergeCells(`A${bs.rowCount}:B${bs.rowCount}`);
+  }
+
+  // ─── Reconciliation Summary ─────────────────────────────────
+  const reconRows = bs.rowCount + 2;
+  bs.addRow([]);
+  bs.addRow(["RECONCILIATION BY ACCOUNT"]);
+  bold(bs.getCell(`A${reconRows + 1}`));
+  bs.addRow(["Account", "Opening", "Movement", "Expected Close", "Closing", "Variance", "Status"]);
+  const reconHeader = bs.rowCount;
+  for (let c = 1; c <= 7; c++) bold(bs.getCell(reconHeader, c));
+
+  for (const acct of input.accountReconData) {
+    const r = reconcileAccountPeriod(acct.opening_balance, acct.closing_balance, input.transactions.filter((t: Transaction) => t.bankAccountId === acct.id));
+    const row = bs.addRow([acct.account_name, r.openingBalance, r.movementTotal, r.expectedClosingBalance, r.closingBalance, r.variance, r.status]);
+    for (let c = 2; c <= 6; c++) row.getCell(c).numFmt = fmt;
+    if (r.status === "unreconciled") {
+      row.getCell(7).font = { color: { argb: "CC0000" } };
+    }
+  }
+
+  if (hasWarnings) {
+    bs.addRow([]);
+    bs.addRow(["⚠ These financial statements are PRELIMINARY. They were generated solely from"]);
+    bs.addRow(["  the uploaded bank statement data and may not reflect all transactions, assets,"]);
+    bs.addRow(["  liabilities, or equity items. This report does not substitute professional"]);
+    bs.addRow(["  accounting or CPA review. Do not use for tax filing or financial decisions"]);
+    bs.addRow(["  without verification by a qualified CPA."]);
+    for (let r = bs.rowCount - 4; r <= bs.rowCount; r++) {
+      bs.getCell(`A${r}`).font = { italic: true, color: { argb: "666666" } };
+    }
+  }
+
+  // ─── Transaction History (optional) ─────────────────────────
+  if (input.includeTransactions) {
+    const th = workbook.addWorksheet("Transaction History", { views: [{ showGridLines: false }] });
+    th.columns = [
+      { header: "Date", key: "date", width: 14 },
+      { header: "Description", key: "description", width: 50 },
+      { header: "Amount", key: "amount", width: 16 },
+      { header: "Final Category", key: "finalCategory", width: 28 },
+    ];
+    th.getRow(1).font = { bold: true };
+
+    for (let i = 0; i < input.transactions.length; i++) {
+      const t = input.transactions[i];
+      const c = input.classifications[i];
+      if (c?.reviewStatus === "excluded") continue;
+      const row = th.addRow({
+        date: t.date,
+        description: t.description,
+        amount: t.amount,
+        finalCategory: c?.finalCategory ?? "Unclassified",
+      });
+      row.getCell(3).numFmt = fmt;
+    }
+  }
 
   const arrayBuffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(arrayBuffer);

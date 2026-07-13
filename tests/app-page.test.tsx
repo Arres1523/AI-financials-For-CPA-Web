@@ -3,12 +3,10 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import Page from "../src/app/page";
 
-describe("Annual CPA Package page", () => {
-  it("shows the core workflow sections", () => {
+describe("Workflow wizard page", () => {
+  it("shows the wizard header and step indicator", () => {
     render(<Page />);
-    expect(screen.getByText("Annual CPA Package")).toBeTruthy();
-    expect(screen.getByText("Document Checklist")).toBeTruthy();
-    expect(screen.getByText("Transaction Review")).toBeTruthy();
-    expect(screen.getByText("Package Blockers")).toBeTruthy();
+    expect(screen.getByText("Annual Financial Workflow")).toBeTruthy();
+    expect(screen.getByText("Company & Year")).toBeTruthy();
   });
 });

@@ -30,7 +30,7 @@ function parseDate(value: string): string {
   return date.toISOString().slice(0, 10);
 }
 
-export function normalizeCsvRows(csv: string, sourceAccount: string, sourceFile: string): Transaction[] {
+export function normalizeCsvRows(csv: string, sourceAccount: string, sourceFile: string, workspaceId = "", bankAccountId = "", statementId = ""): Transaction[] {
   const parsed = Papa.parse<Record<string, string>>(csv.trim(), { header: true, skipEmptyLines: true });
 
   return parsed.data.map((row, index) => {
@@ -41,14 +41,15 @@ export function normalizeCsvRows(csv: string, sourceAccount: string, sourceFile:
 
     return {
       id: `${sourceFile}-${index + 1}`,
+      workspaceId,
+      bankAccountId,
+      statementId,
       date: parseDate(findValue(row, aliases.date)),
-      sourceAccount,
       description: findValue(row, aliases.description),
       amount,
-      sourceCategory: "",
-      type: "",
-      sourceBalance: findValue(row, aliases.balance) ? parseAmount(findValue(row, aliases.balance)) : null,
-      sourceFile
+      balance: findValue(row, aliases.balance) ? parseAmount(findValue(row, aliases.balance)) : null,
+      originalRowIndex: index,
+      createdAt: new Date().toISOString()
     };
   });
 }

@@ -1,6 +1,4 @@
 import { Pool, PoolClient } from "pg";
-import { setServers } from "dns";
-import dns from "dns/promises";
 
 let _pool: Pool | null = null;
 let _initPromise: Promise<void> | null = null;
@@ -125,22 +123,7 @@ const MIGRATIONS: [string, string][] = [
 
 async function initialize(): Promise<void> {
   const url = getConnectionString();
-  let { hostname: host, port, username: user, password, pathname } = new URL(url);
-  port = port || "5432";
-  const database = pathname.replace(/^\//, "");
-  setServers(["8.8.8.8", "1.1.1.1"]);
-  try {
-    const addrs = await dns.resolve4(host);
-    if (addrs.length > 0) host = addrs[0];
-  } catch {
-    try {
-      const addrs = await dns.resolve6(host);
-      if (addrs.length > 0) host = addrs[0];
-    } catch {
-      // use original hostname
-    }
-  }
-  _pool = new Pool({ host, port: parseInt(port), user, password, database, max: 5 });
+  _pool = new Pool({ connectionString: url, max: 5 });
   _pool.on("error", (err) => {
     console.error("Unexpected pool error", err);
   });

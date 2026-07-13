@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { query, queryOne, execute } from "@/lib/db";
 import { buildReportsFromClassifications } from "@/domain/reporting";
 import { buildWorkbookBuffer } from "@/exports/workbook";
 import { v4 as uuid } from "uuid";
@@ -18,14 +18,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "workspaceId required" }, { status: 400 });
   }
 
-  const db = getDb();
-
-  // Derive company name and tax year from workspace
-  const ws = db.prepare(`
+  const ws = await queryOne(`
     SELECT w.*, c.legal_name FROM workspaces w
     JOIN companies c ON c.id = w.company_id
-    WHERE w.id = ?
-  `).get(body.workspaceId) as any;
+    WHERE w.id = $1
+  `, [body.workspaceId]);
 
   if (!ws) {
     return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
@@ -34,13 +31,13 @@ export async function POST(request: Request) {
   const companyName = ws.legal_name;
   const taxYear = ws.tax_year;
 
-  const txRows = db.prepare(`
+  const txRows = await query(`
     SELECT t.*, c.final_category, c.report_type, c.confidence, c.rule_used, c.review_status
     FROM transactions t
     JOIN classifications c ON c.transaction_id = t.id
-    WHERE t.workspace_id = ? AND c.review_status != 'excluded'
+    WHERE t.workspace_id = $1 AND c.review_status != 'excluded'
     ORDER BY t.date ASC, t.original_row_index ASC
-  `).all(body.workspaceId) as any[];
+  `, [body.workspaceId]);
 
   const transactions = txRows.map((r: any) => ({
     id: r.id,
@@ -80,14 +77,14 @@ export async function POST(request: Request) {
     classifications[i]?.confidence === "low"
   );
 
-  const accountReconData = db.prepare(`
+  const accountReconData = await query(`
     SELECT a.id, a.account_name, a.opening_balance, a.closing_balance,
            COALESCE(SUM(t.amount), 0) as movement_total
     FROM bank_accounts a
-    LEFT JOIN transactions t ON t.bank_account_id = a.id AND t.workspace_id = ?
-    WHERE a.company_id = (SELECT company_id FROM workspaces WHERE id = ?)
+    LEFT JOIN transactions t ON t.bank_account_id = a.id AND t.workspace_id = $1
+    WHERE a.company_id = (SELECT company_id FROM workspaces WHERE id = $2)
     GROUP BY a.id
-  `).all(body.workspaceId, body.workspaceId) as any[];
+  `, [body.workspaceId, body.workspaceId]);
 
   const buffer = await buildWorkbookBuffer({
     companyName,
@@ -101,8 +98,9 @@ export async function POST(request: Request) {
   });
 
   // Register export
-  db.prepare("INSERT INTO report_exports (id, workspace_id, export_type) VALUES (?, ?, ?)").run(
-    uuid(), body.workspaceId, body.includeTransactions ? "with_transactions" : "financial_only"
+  await execute(
+    "INSERT INTO report_exports (id, workspace_id, export_type) VALUES ($1, $2, $3)",
+    [uuid(), body.workspaceId, body.includeTransactions ? "with_transactions" : "financial_only"]
   );
 
   // Do NOT mark workspace as completed — exports are preliminary drafts

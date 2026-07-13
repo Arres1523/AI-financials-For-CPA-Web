@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { query, queryOne, withTransaction } from "@/lib/db";
 import { v4 as uuid } from "uuid";
 import { importRows, hashFile } from "@/domain/importXlsx";
 import type { ColumnMapping } from "@/domain/types";
@@ -51,12 +51,11 @@ export async function POST(request: Request) {
   const fileName = file.name;
   const fileHash = hashFile(buffer);
 
-  const db = getDb();
-
   // Check for duplicate file hash
-  const existingStmt = db.prepare(
-    "SELECT id, imported_rows FROM uploaded_statements WHERE workspace_id = ? AND file_hash = ?"
-  ).get(workspaceId, fileHash) as any;
+  const existingStmt = await queryOne(
+    "SELECT id, imported_rows FROM uploaded_statements WHERE workspace_id = $1 AND file_hash = $2",
+    [workspaceId, fileHash]
+  );
 
   if (existingStmt) {
     return NextResponse.json({
@@ -73,22 +72,20 @@ export async function POST(request: Request) {
   }
 
   const statementId = uuid();
-  db.prepare(
-    "INSERT INTO uploaded_statements (id, workspace_id, bank_account_id, file_name, sheet_name, total_rows, imported_rows, file_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-  ).run(statementId, workspaceId, bankAccountId, fileName, rows[0]?.sheetName || null, rows.length, rows.length, fileHash);
 
-  const insertTx = db.prepare(
-    "INSERT INTO transactions (id, workspace_id, bank_account_id, statement_id, date, description, amount, balance, original_row_index) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
-  );
-  const insertCl = db.prepare(
-    "INSERT INTO classifications (id, transaction_id, final_category, report_type, confidence, rule_used, review_status) VALUES (?, ?, ?, ?, ?, ?, ?)"
-  );
+  const imported = await withTransaction(async (client) => {
+    await client.query(
+      "INSERT INTO uploaded_statements (id, workspace_id, bank_account_id, file_name, sheet_name, total_rows, imported_rows, file_hash) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+      [statementId, workspaceId, bankAccountId, fileName, rows[0]?.sheetName || null, rows.length, rows.length, fileHash]
+    );
 
-  const txn = db.transaction(() => {
-    let imported = 0;
+    let count = 0;
     for (const row of rows) {
       const txId = uuid();
-      insertTx.run(txId, workspaceId, bankAccountId, statementId, row.date, row.description, row.amount, row.balance, row.rowIndex);
+      await client.query(
+        "INSERT INTO transactions (id, workspace_id, bank_account_id, statement_id, date, description, amount, balance, original_row_index) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+        [txId, workspaceId, bankAccountId, statementId, row.date, row.description, row.amount, row.balance, row.rowIndex]
+      );
       const classification = classifyTransaction({
         id: txId,
         workspaceId,
@@ -101,21 +98,14 @@ export async function POST(request: Request) {
         originalRowIndex: row.rowIndex,
         createdAt: new Date().toISOString(),
       });
-      insertCl.run(
-        classification.id,
-        txId,
-        classification.finalCategory,
-        classification.reportType,
-        classification.confidence,
-        classification.ruleUsed,
-        classification.reviewStatus
+      await client.query(
+        "INSERT INTO classifications (id, transaction_id, final_category, report_type, confidence, rule_used, review_status) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        [classification.id, txId, classification.finalCategory, classification.reportType, classification.confidence, classification.ruleUsed, classification.reviewStatus]
       );
-      imported++;
+      count++;
     }
-    return imported;
+    return count;
   });
-
-  const imported = txn();
 
   return NextResponse.json({
     imported,

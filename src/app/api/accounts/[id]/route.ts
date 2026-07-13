@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { queryOne, execute } from "@/lib/db";
 
 export const runtime = "nodejs";
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const db = getDb();
   let body: any;
   try {
     body = await request.json();
@@ -16,14 +15,15 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   if (!accountName || !bankName || !lastFour) {
     return NextResponse.json({ error: "accountName, bankName, lastFour are required" }, { status: 400 });
   }
-  const existing = db.prepare("SELECT id FROM bank_accounts WHERE id = ?").get(id);
+  const existing = await queryOne("SELECT id FROM bank_accounts WHERE id = $1", [id]);
   if (!existing) {
     return NextResponse.json({ error: "Account not found" }, { status: 404 });
   }
-  db.prepare(
-    "UPDATE bank_accounts SET account_name = ?, bank_name = ?, last_four = ?, account_type = ?, opening_balance = ?, closing_balance = ? WHERE id = ?"
-  ).run(accountName, bankName, lastFour, accountType, openingBalance ?? 0, closingBalance ?? 0, id);
-  const row = db.prepare("SELECT * FROM bank_accounts WHERE id = ?").get(id) as any;
+  await execute(
+    "UPDATE bank_accounts SET account_name = $1, bank_name = $2, last_four = $3, account_type = $4, opening_balance = $5, closing_balance = $6 WHERE id = $7",
+    [accountName, bankName, lastFour, accountType, openingBalance ?? 0, closingBalance ?? 0, id]
+  );
+  const row = await queryOne("SELECT * FROM bank_accounts WHERE id = $1", [id]);
   return NextResponse.json({
     id: row.id,
     companyId: row.company_id,
@@ -39,7 +39,6 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const db = getDb();
-  db.prepare("DELETE FROM bank_accounts WHERE id = ?").run(id);
+  await execute("DELETE FROM bank_accounts WHERE id = $1", [id]);
   return NextResponse.json({ success: true });
 }

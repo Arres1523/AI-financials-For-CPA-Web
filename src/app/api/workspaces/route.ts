@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { query, queryOne, execute } from "@/lib/db";
 import { v4 as uuid } from "uuid";
 
 export const runtime = "nodejs";
@@ -7,15 +7,14 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const companyId = searchParams.get("companyId");
-  const db = getDb();
-  let workspaces: any[];
+  let rows: any[];
   if (companyId) {
-    workspaces = db.prepare("SELECT * FROM workspaces WHERE company_id = ? ORDER BY tax_year DESC").all(companyId);
+    rows = await query("SELECT * FROM workspaces WHERE company_id = $1 ORDER BY tax_year DESC", [companyId]);
   } else {
-    workspaces = db.prepare("SELECT * FROM workspaces ORDER BY created_at DESC").all();
+    rows = await query("SELECT * FROM workspaces ORDER BY created_at DESC");
   }
   return NextResponse.json(
-    workspaces.map((w: any) => ({
+    rows.map((w: any) => ({
       id: w.id,
       companyId: w.company_id,
       taxYear: w.tax_year,
@@ -27,7 +26,6 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const db = getDb();
   let body: any;
   try {
     body = await request.json();
@@ -38,13 +36,13 @@ export async function POST(request: Request) {
   if (!companyId || !taxYear) {
     return NextResponse.json({ error: "companyId and taxYear are required" }, { status: 400 });
   }
-  const existing = db.prepare("SELECT id FROM workspaces WHERE company_id = ? AND tax_year = ?").get(companyId, taxYear);
+  const existing = await queryOne("SELECT id FROM workspaces WHERE company_id = $1 AND tax_year = $2", [companyId, taxYear]);
   if (existing) {
-    return NextResponse.json({ error: "Workspace already exists", id: (existing as any).id }, { status: 409 });
+    return NextResponse.json({ error: "Workspace already exists", id: existing.id }, { status: 409 });
   }
   const id = uuid();
-  db.prepare("INSERT INTO workspaces (id, company_id, tax_year) VALUES (?, ?, ?)").run(id, companyId, taxYear);
-  const row = db.prepare("SELECT * FROM workspaces WHERE id = ?").get(id) as any;
+  await execute("INSERT INTO workspaces (id, company_id, tax_year) VALUES ($1, $2, $3)", [id, companyId, taxYear]);
+  const row = await queryOne("SELECT * FROM workspaces WHERE id = $1", [id]);
   return NextResponse.json({
     id: row.id,
     companyId: row.company_id,
@@ -56,10 +54,9 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const db = getDb();
   const { id, status } = await request.json();
-  db.prepare("UPDATE workspaces SET status = ?, updated_at = datetime('now') WHERE id = ?").run(status, id);
-  const row = db.prepare("SELECT * FROM workspaces WHERE id = ?").get(id) as any;
+  await execute("UPDATE workspaces SET status = $1, updated_at = NOW() WHERE id = $2", [status, id]);
+  const row = await queryOne("SELECT * FROM workspaces WHERE id = $1", [id]);
   return NextResponse.json({
     id: row.id,
     companyId: row.company_id,

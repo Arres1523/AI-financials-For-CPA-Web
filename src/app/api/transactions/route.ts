@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDb } from "@/lib/db";
+import { query } from "@/lib/db";
 
 export const runtime = "nodejs";
 
@@ -12,36 +12,38 @@ export async function GET(request: Request) {
 
   if (!workspaceId) return NextResponse.json({ error: "workspaceId required" }, { status: 400 });
 
-  const db = getDb();
-  let query = `
+  let sql = `
     SELECT t.*, c.id as c_id, c.final_category, c.report_type, c.confidence, c.rule_used, c.review_status, c.is_manual_correction, c.created_at as c_created_at, c.updated_at as c_updated_at,
            a.account_name, a.bank_name, a.last_four
     FROM transactions t
     LEFT JOIN classifications c ON c.transaction_id = t.id
     LEFT JOIN bank_accounts a ON a.id = t.bank_account_id
-    WHERE t.workspace_id = ?
+    WHERE t.workspace_id = $1
   `;
-  const params: any[] = [workspaceId];
+  const params: unknown[] = [workspaceId];
+  let paramIndex = 2;
 
   if (bankAccountId) {
-    query += " AND t.bank_account_id = ?";
+    sql += ` AND t.bank_account_id = $${paramIndex}`;
     params.push(bankAccountId);
+    paramIndex++;
   }
 
   if (needsReview === "true") {
-    query += " AND (c.review_status = 'pending' AND (c.confidence IN ('low', 'medium') OR c.final_category IN ('Capital Improvements', 'Transfer Clearing')))";
+    sql += ` AND (c.review_status = 'pending' AND (c.confidence IN ('low', 'medium') OR c.final_category IN ('Capital Improvements', 'Transfer Clearing')))`;
   }
 
   if (reviewStatus) {
-    query += " AND c.review_status = ?";
+    sql += ` AND c.review_status = $${paramIndex}`;
     params.push(reviewStatus);
+    paramIndex++;
   }
 
-  query += " ORDER BY t.date ASC, t.original_row_index ASC";
+  sql += " ORDER BY t.date ASC, t.original_row_index ASC";
 
-  const rows = db.prepare(query).all(...params) as any[];
+  const rows = await query(sql, params);
   return NextResponse.json(
-    rows.map((r) => ({
+    rows.map((r: any) => ({
       id: r.id,
       workspaceId: r.workspace_id,
       bankAccountId: r.bank_account_id,

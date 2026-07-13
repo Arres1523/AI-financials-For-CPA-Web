@@ -5,7 +5,9 @@ out
 .DS_Store
 *.log
 tsconfig.tsbuildinfo
-.env*
+.env
+.env.local
+.env.*.local
 data/*.db
 data/*.db-wal
 data/*.db-shm

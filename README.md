@@ -4,19 +4,20 @@ Annual financial workflow MVP for CPAs. Processes XLSX bank statements, auto-cla
 
 ## Prerequisites
 
-- Node.js >=26.5.0 <27
+- Node.js 24.x
 - pnpm (see `packageManager` in package.json)
+- A Postgres database (Supabase, Neon, or local)
 
 ```bash
 # Use the correct Node version
 nvm use           # reads .nvmrc
-# or install manually with the version in .nvmrc
 
-# Clean install
+# Copy and configure environment
+cp .env.example .env.local
+# Set DATABASE_URL to your Postgres connection string
+
+# Install dependencies
 pnpm install
-
-# Rebuild native dependencies (needed after Node version change)
-pnpm rebuild better-sqlite3
 ```
 
 ## Development
@@ -42,7 +43,7 @@ pnpm build        # production build
 ## Architecture
 
 - **Frontend**: Next.js 15 (App Router), React 19, Tailwind CSS
-- **Backend**: Next.js API routes, SQLite via `better-sqlite3`
+- **Backend**: Next.js API routes, Postgres via `pg` (Supabase compatible)
 - **Import**: `xlsx` (SheetJS), first-sheet-only, deterministic classification
 - **Export**: ExcelJS — P&L, Preliminary Balance Sheet from Bank Activity, optional Transaction History
 - **Testing**: Vitest (unit), Playwright (E2E)
@@ -54,5 +55,5 @@ pnpm build        # production build
 - No external AI inference — classification is rule-based.
 - Balance Sheet is explicitly preliminary — based on classified bank activity, not full accounting records.
 - No automatic journal entries, tax basis calculations, or QuickBooks integration.
-- No authentication, multi-user, or cloud persistence.
+- No authentication, multi-user, or cloud persistence (beyond Supabase hosting).
 - `classification_rules` table exists but is reserved for a future phase — no automatic learning.

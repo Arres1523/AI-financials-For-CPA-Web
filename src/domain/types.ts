@@ -53,6 +53,7 @@ export type Transaction = {
   balance: number | null;
   originalRowIndex: number;
   createdAt: string;
+  companyId?: string;
 };
 
 export type Classification = {
@@ -90,6 +91,18 @@ export type ClassificationRule = {
   createdAt: string;
 };
 
+export type CounterpartyRule = {
+  id: string;
+  companyId: string;
+  pattern: string;
+  direction: "in" | "out" | "any";
+  finalCategory: string;
+  reportType: ReportType;
+  confidence: Confidence;
+  reviewStatus: ReviewStatus;
+  ruleUsed: string;
+};
+
 export type ReviewEvent = {
   id: string;
   transactionId: string;
@@ -103,6 +116,7 @@ export type ReviewEvent = {
 export type XlsxImportRow = {
   date: string;
   description: string;
+  classificationText?: string;
   amount: number;
   balance: number | null;
   rowIndex: number;
@@ -143,6 +157,7 @@ export type ReportPackage = {
 export type ColumnMapping = {
   date: string;
   description: string;
+  payee?: string;
   amount?: string;
   debit?: string;
   credit?: string;

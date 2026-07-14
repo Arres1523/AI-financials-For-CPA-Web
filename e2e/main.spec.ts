@@ -1,3 +1,11 @@
+if (!process.env.DATABASE_URL_TEST) {
+  throw new Error(
+    "E2E tests require DATABASE_URL_TEST environment variable.\n" +
+    "Set it in .env.local or export it before running:\n" +
+    "  export DATABASE_URL_TEST=postgresql://..."
+  );
+}
+
 import { test, expect } from "@playwright/test";
 import path from "path";
 import ExcelJS from "exceljs";

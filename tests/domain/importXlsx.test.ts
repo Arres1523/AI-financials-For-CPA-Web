@@ -2,9 +2,17 @@ import { describe, expect, it } from "vitest";
 import { buildPreview, importRows } from "../../src/domain/importXlsx";
 import fs from "fs";
 import path from "path";
+import * as XLSX from "xlsx";
 
 function readFixture(name: string): Buffer {
   return fs.readFileSync(path.join(__dirname, "../fixtures", name));
+}
+
+function makeQBWorkbook(rows: Record<string, string>[]): Buffer {
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+  return Buffer.from(XLSX.write(wb, { type: "buffer", bookType: "xlsx" }));
 }
 
 describe("importXlsx", () => {
@@ -41,6 +49,153 @@ describe("importXlsx", () => {
       const preview = buildPreview(readFixture("empty_sample.xlsx"), "empty_sample.xlsx");
       expect(preview.totalRows).toBe(0);
       expect(preview.errors.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("QB Payee/Memo support", () => {
+    it("uses memo when payee is empty", () => {
+      const buf = makeQBWorkbook([
+        { Date: "01/15/2026", Memo: "Office supplies", Payee: "", Payment: "150.00", Deposit: "" },
+      ]);
+      const { rows, errors } = importRows(
+        buf, "qb.xlsx",
+        { date: "Date", description: "Memo", payee: "Payee", debit: "Payment", credit: "Deposit" },
+        "ws-1", "ba-1", 2026
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].description).toBe("Office supplies");
+      expect(rows[0].classificationText).toBe("Office supplies");
+      expect(errors).toHaveLength(0);
+    });
+
+    it("uses payee when memo is empty (Wyndham case)", () => {
+      const buf = makeQBWorkbook([
+        { Date: "01/31/2026", Memo: "", Payee: "Wyndham Investment Group LLC", Payment: "", Deposit: "675.00" },
+      ]);
+      const { rows, errors } = importRows(
+        buf, "qb.xlsx",
+        { date: "Date", description: "Memo", payee: "Payee", debit: "Payment", credit: "Deposit" },
+        "ws-1", "ba-1", 2026
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].description).toBe("Wyndham Investment Group LLC");
+      expect(rows[0].classificationText).toBe("Wyndham Investment Group LLC");
+      expect(errors).toHaveLength(0);
+    });
+
+    it("combines payee and memo when both differ", () => {
+      const buf = makeQBWorkbook([
+        { Date: "02/01/2026", Memo: "Monthly rent", Payee: "ABC Properties LLC", Payment: "5000.00", Deposit: "" },
+      ]);
+      const { rows, errors } = importRows(
+        buf, "qb.xlsx",
+        { date: "Date", description: "Memo", payee: "Payee", debit: "Payment", credit: "Deposit" },
+        "ws-1", "ba-1", 2026
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].description).toBe("Monthly rent");
+      expect(rows[0].classificationText).toBe("ABC Properties LLC | Monthly rent");
+      expect(errors).toHaveLength(0);
+    });
+
+    it("deduplicates when payee and memo are identical", () => {
+      const buf = makeQBWorkbook([
+        { Date: "03/01/2026", Memo: "Wyndham Investment Group LLC", Payee: "Wyndham Investment Group LLC", Payment: "", Deposit: "700.00" },
+      ]);
+      const { rows, errors } = importRows(
+        buf, "qb.xlsx",
+        { date: "Date", description: "Memo", payee: "Payee", debit: "Payment", credit: "Deposit" },
+        "ws-1", "ba-1", 2026
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].description).toBe("Wyndham Investment Group LLC");
+      expect(rows[0].classificationText).toBe("Wyndham Investment Group LLC");
+      expect(errors).toHaveLength(0);
+    });
+
+    it("marks as incomplete_row when both payee and memo are empty", () => {
+      const buf = makeQBWorkbook([
+        { Date: "04/01/2026", Memo: "", Payee: "", Payment: "100.00", Deposit: "" },
+      ]);
+      const { rows, errors } = importRows(
+        buf, "qb.xlsx",
+        { date: "Date", description: "Memo", payee: "Payee", debit: "Payment", credit: "Deposit" },
+        "ws-1", "ba-1", 2026
+      );
+      expect(rows).toHaveLength(1);
+      expect(errors).toHaveLength(1);
+      expect(errors[0].type).toBe("incomplete_row");
+    });
+
+    it("handles Payment as negative amount", () => {
+      const buf = makeQBWorkbook([
+        { Date: "05/01/2026", Memo: "Electric bill", Payee: "PG&E", Payment: "250.00", Deposit: "" },
+      ]);
+      const { rows, errors } = importRows(
+        buf, "qb.xlsx",
+        { date: "Date", description: "Memo", payee: "Payee", debit: "Payment", credit: "Deposit" },
+        "ws-1", "ba-1", 2026
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].amount).toBe(-250);
+      expect(errors).toHaveLength(0);
+    });
+
+    it("handles Deposit as positive amount", () => {
+      const buf = makeQBWorkbook([
+        { Date: "06/01/2026", Memo: "Rent income", Payee: "Tenant A", Payment: "", Deposit: "1500.00" },
+      ]);
+      const { rows, errors } = importRows(
+        buf, "qb.xlsx",
+        { date: "Date", description: "Memo", payee: "Payee", debit: "Payment", credit: "Deposit" },
+        "ws-1", "ba-1", 2026
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].amount).toBe(1500);
+      expect(errors).toHaveLength(0);
+    });
+
+    it("handles both Payment and Deposit present (net)", () => {
+      const buf = makeQBWorkbook([
+        { Date: "07/01/2026", Memo: "Net transaction", Payee: "Bank", Payment: "100.00", Deposit: "250.00" },
+      ]);
+      const { rows, errors } = importRows(
+        buf, "qb.xlsx",
+        { date: "Date", description: "Memo", payee: "Payee", debit: "Payment", credit: "Deposit" },
+        "ws-1", "ba-1", 2026
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].amount).toBe(150);
+      expect(errors).toHaveLength(0);
+    });
+
+    it("handles zero amount", () => {
+      const buf = makeQBWorkbook([
+        { Date: "08/01/2026", Memo: "Zero tx", Payee: "", Payment: "0.00", Deposit: "" },
+      ]);
+      const { rows, errors } = importRows(
+        buf, "qb.xlsx",
+        { date: "Date", description: "Memo", payee: "Payee", debit: "Payment", credit: "Deposit" },
+        "ws-1", "ba-1", 2026
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].amount).toBe(0);
+      expect(errors).toHaveLength(0);
+    });
+
+    it("handles special characters in descriptions", () => {
+      const buf = makeQBWorkbook([
+        { Date: "09/01/2026", Memo: "Café & Bakery #3", Payee: "José's Café, LLC", Payment: "45.50", Deposit: "" },
+      ]);
+      const { rows, errors } = importRows(
+        buf, "qb.xlsx",
+        { date: "Date", description: "Memo", payee: "Payee", debit: "Payment", credit: "Deposit" },
+        "ws-1", "ba-1", 2026
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].description).toBe("Café & Bakery #3");
+      expect(rows[0].classificationText).toBe("José's Café, LLC | Café & Bakery #3");
+      expect(errors).toHaveLength(0);
     });
   });
 

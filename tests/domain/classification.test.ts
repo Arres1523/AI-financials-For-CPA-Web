@@ -97,7 +97,7 @@ describe("classifyTransaction", () => {
     const c = classifyTransaction(tx("AUTOPAY 2954520RAUTOPAY AUTO-PMT", -1847.83));
     expect(c.finalCategory).toBe("Credit card payable");
     expect(c.reportType).toBe("Balance Sheet");
-    expect(c.confidence).toBe("medium");
+    expect(c.confidence).toBe("high");
     expect(c.reviewStatus).toBe("card_statements_needed");
   });
 
@@ -148,5 +148,45 @@ describe("classifyTransaction", () => {
     const c = classifyTransaction(tx("MONTHLY MERCHANT FEE", -15));
     expect(c.finalCategory).toBe("Merchant Processing Fees");
     expect(c.reportType).toBe("P&L");
+  });
+
+  // --- Step 4: Counterparty Rules (Wyndham) ---
+  const txWithCompany = (desc: string, amount: number, companyId?: string): Transaction => ({
+    ...tx(desc, amount),
+    companyId,
+  });
+
+  it("matches Wyndham positive deposit via counterparty rule (Valoris)", () => {
+    const c = classifyTransaction(txWithCompany("Wyndham Investment Group LLC", 675, "valoris-capital-partners"));
+    expect(c.finalCategory).toBe("Operating / merchant income");
+    expect(c.reportType).toBe("P&L");
+    expect(c.confidence).toBe("high");
+    expect(c.reviewStatus).toBe("approved");
+    expect(c.ruleUsed).toContain("Wyndham");
+  });
+
+  it("does NOT match Wyndham with negative amount (direction in)", () => {
+    const c = classifyTransaction(txWithCompany("Wyndham Investment Group LLC", -675, "valoris-capital-partners"));
+    expect(c.finalCategory).toBe("Uncategorized / Needs Review");
+  });
+
+  it("does NOT match Wyndham for another company without rule", () => {
+    const c = classifyTransaction(txWithCompany("Wyndham Investment Group LLC", 675, "other-company"));
+    expect(c.finalCategory).toBe("Uncategorized / Needs Review");
+  });
+
+  it("does NOT match similar-but-not-identical name", () => {
+    const c = classifyTransaction(txWithCompany("Wyndham Investment Group Inc", 675, "valoris-capital-partners"));
+    expect(c.finalCategory).toBe("Uncategorized / Needs Review");
+  });
+
+  it("falls back for unknown payee with positive deposit", () => {
+    const c = classifyTransaction(txWithCompany("Some Unknown Deposit from ABC Corp", 1500, "valoris-capital-partners"));
+    expect(c.finalCategory).toBe("Uncategorized / Needs Review");
+  });
+
+  it("works without companyId (backward compat)", () => {
+    const c = classifyTransaction(txWithCompany("Wyndham Investment Group LLC", 675));
+    expect(c.finalCategory).toBe("Uncategorized / Needs Review");
   });
 });

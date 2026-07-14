@@ -11,6 +11,7 @@ export const runtime = "nodejs";
 const mappingSchema = z.object({
   date: z.string().min(1, "Date column required"),
   description: z.string().min(1, "Description column required"),
+  payee: z.string().optional(),
   amount: z.string().optional(),
   debit: z.string().optional(),
   credit: z.string().optional(),
@@ -82,6 +83,7 @@ export async function POST(request: Request) {
     let count = 0;
     for (const row of rows) {
       const txId = uuid();
+      const descForClassification = row.classificationText || row.description;
       await client.query(
         "INSERT INTO transactions (id, workspace_id, bank_account_id, statement_id, date, description, amount, balance, original_row_index) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
         [txId, workspaceId, bankAccountId, statementId, row.date, row.description, row.amount, row.balance, row.rowIndex]
@@ -92,7 +94,7 @@ export async function POST(request: Request) {
         bankAccountId,
         statementId,
         date: row.date,
-        description: row.description,
+        description: descForClassification,
         amount: row.amount,
         balance: row.balance,
         originalRowIndex: row.rowIndex,

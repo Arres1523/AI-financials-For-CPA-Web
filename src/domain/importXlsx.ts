@@ -6,9 +6,10 @@ export function hashFile(buffer: Buffer): string {
   return crypto.createHash("sha256").update(buffer).digest("hex");
 }
 
+const PAYEE_ALIASES = [/payee/i, /vendor/i, /supplier/i, /customer/i, /received from/i, /paid to/i];
 const AMOUNT_ALIASES = [/amount/i, /transaction/i, /value/i, /sum/i, /total/i];
 const DATE_ALIASES = [/date/i, /transaction date/i, /posted date/i, /posting date/i, /trans.?date/i];
-const DESC_ALIASES = [/description/i, /memo/i, /details/i, /name/i, /narrative/i, /payee/i, /merchant/i, /reference/i];
+const DESC_ALIASES = [/description/i, /memo/i, /details/i, /name/i, /narrative/i, /merchant/i, /reference/i];
 const DEBIT_ALIASES = [/debit/i, /withdrawal/i, /payment/i, /paid out/i, /outflow/i, /chq/i];
 const CREDIT_ALIASES = [/credit/i, /deposit/i, /received/i, /paid in/i, /inflow/i];
 const BALANCE_ALIASES = [/balance/i, /running balance/i, /ledger balance/i, /available/i];
@@ -23,12 +24,13 @@ function detectColumns(sampleRows: Record<string, string>[], headers: string[]):
 } {
   const dateCol = matchColumn(headers, DATE_ALIASES);
   const descCol = matchColumn(headers, DESC_ALIASES);
+  const payeeCol = matchColumn(headers, PAYEE_ALIASES);
   const amountCol = matchColumn(headers, AMOUNT_ALIASES);
   const debitCol = matchColumn(headers, DEBIT_ALIASES);
   const creditCol = matchColumn(headers, CREDIT_ALIASES);
   const balanceCol = matchColumn(headers, BALANCE_ALIASES);
 
-  const found = [dateCol, descCol, amountCol, debitCol, creditCol, balanceCol].filter(Boolean).length;
+  const found = [dateCol, descCol, payeeCol, amountCol, debitCol, creditCol, balanceCol].filter(Boolean).length;
   const hasAmount = !!amountCol || (!!debitCol && !!creditCol);
   const confidence = found >= 2 && hasAmount ? (found >= 4 ? "high" : found >= 3 ? "medium" : "medium") : "low";
 
@@ -36,6 +38,7 @@ function detectColumns(sampleRows: Record<string, string>[], headers: string[]):
     mapping: {
       date: dateCol,
       description: descCol,
+      payee: payeeCol,
       amount: amountCol,
       debit: debitCol,
       credit: creditCol,
@@ -211,6 +214,7 @@ export function importRows(
     rowIndex++;
     const dateRaw = raw[mapping.date] ?? "";
     const descRaw = raw[mapping.description] ?? "";
+    const payeeRaw = mapping.payee ? (raw[mapping.payee] ?? "") : "";
     const amountRaw = mapping.amount ? (raw[mapping.amount] ?? "") : "";
     const debitRaw = mapping.debit ? (raw[mapping.debit] ?? "") : "";
     const creditRaw = mapping.credit ? (raw[mapping.credit] ?? "") : "";
@@ -244,22 +248,39 @@ export function importRows(
       continue;
     }
 
-    if (!descRaw.trim()) {
+    const memo = descRaw.trim();
+    const payeeVal = payeeRaw.trim();
+
+    // Build classification text (used by the classifier)
+    let classificationText: string;
+    if (payeeVal && memo && payeeVal !== memo) {
+      classificationText = payeeVal + " | " + memo;
+    } else if (payeeVal) {
+      classificationText = payeeVal;
+    } else {
+      classificationText = memo;
+    }
+
+    // Best available text for UI display
+    const displayDesc = memo || payeeVal || "";
+
+    if (!displayDesc) {
       errors.push({ row: rowIndex, type: "incomplete_row", message: `Row ${rowIndex}: Missing description` });
     }
 
     const balance = balanceRaw ? parseAmount(balanceRaw) : null;
-    const key = `${date}|${descRaw.trim()}|${amount}`;
+    const key = `${date}|${classificationText}|${amount}`;
 
     if (seen.has(key)) {
-      errors.push({ row: rowIndex, type: "duplicate_transaction", message: `Row ${rowIndex}: Duplicate transaction "${descRaw.trim()}" on ${date}` });
+      errors.push({ row: rowIndex, type: "duplicate_transaction", message: `Row ${rowIndex}: Duplicate transaction "${classificationText}" on ${date}` });
       continue;
     }
     seen.add(key);
 
     rows.push({
       date,
-      description: descRaw.trim() || "(empty)",
+      description: displayDesc || "(empty)",
+      classificationText: classificationText || "(empty)",
       amount,
       balance,
       rowIndex: rowIndex - 1,

@@ -2,7 +2,7 @@
 import React from "react";
 
 import { useState, useRef, useEffect } from "react";
-import type { BankAccount, ColumnMapping, UploadPreview, ImportError, Workspace } from "@/domain/types";
+import type { BankAccount, ColumnMapping, UploadPreview, ImportError, UploadedStatement, Workspace } from "@/domain/types";
 import ColumnMapper from "./ColumnMapper";
 
 type Props = {
@@ -22,6 +22,9 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
   const fileBuffersRef = useRef<Map<string, ArrayBuffer>>(new Map());
   const continueRef = useRef<HTMLDivElement>(null);
+  const [persistedStatements, setPersistedStatements] = useState<UploadedStatement[]>([]);
+  const [statementsLoading, setStatementsLoading] = useState(true);
+  const [statementsError, setStatementsError] = useState("");
 
   function resetFileInput() {
     if (fileRef.current) fileRef.current.value = "";
@@ -112,8 +115,30 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
     }
   }, [results.length]);
 
+  useEffect(() => {
+    async function loadPersisted() {
+      try {
+        setStatementsLoading(true);
+        const res = await fetch(`/api/statements?workspaceId=${workspace.id}`);
+        if (res.ok) {
+          const data: UploadedStatement[] = await res.json();
+          setPersistedStatements(data);
+        } else {
+          setStatementsError("Failed to load previously imported statements");
+        }
+      } catch {
+        setStatementsError("Failed to load previously imported statements");
+      } finally {
+        setStatementsLoading(false);
+      }
+    }
+    loadPersisted();
+  }, [workspace.id]);
+
   const totalImported = results.reduce((s, r) => s + r.imported, 0);
   const totalErrors = results.reduce((s, r) => s + r.errors.length, 0);
+  const totalPersistedImported = persistedStatements.reduce((s, p) => s + p.importedRows, 0);
+  const canContinue = !statementsLoading && (results.length > 0 || persistedStatements.length > 0);
 
   return (
     <div className="space-y-6">
@@ -144,6 +169,34 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
         />
         <p className="mt-2 text-xs text-slate-400">Accepts .xlsx files only, multiple files allowed</p>
       </div>
+
+      {/* Loading persisted statements */}
+      {statementsLoading && (
+        <div className="rounded border border-line p-4 text-center text-sm text-slate-500">
+          Loading previously imported statements…
+        </div>
+      )}
+
+      {/* Statements fetch error */}
+      {statementsError && (
+        <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">
+          <p className="font-medium">{statementsError}</p>
+        </div>
+      )}
+
+      {/* Previously imported statements */}
+      {persistedStatements.length > 0 && (
+        <div className="rounded border border-sage/30 bg-sage/5 p-4">
+          <p className="text-sm font-medium text-sage">Previously imported statements</p>
+          <ul className="mt-2 space-y-1">
+            {persistedStatements.map((s) => (
+              <li key={s.id} className="text-sm text-slate-600">
+                {s.fileName} — {s.importedRows} transaction{s.importedRows !== 1 ? "s" : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Error banner */}
       {fileError && (
@@ -253,10 +306,12 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
       <div ref={continueRef} className="flex justify-end border-t border-line pt-4">
         <button
           onClick={onComplete}
-          disabled={results.length === 0}
+          disabled={!canContinue}
           className="rounded bg-ink px-8 py-3 text-sm font-medium text-white disabled:opacity-40 hover:opacity-90"
         >
-          {results.length === 0 ? "Upload and import at least one statement" : `Continue to Review (${totalImported} transactions)`}
+          {canContinue
+            ? `Continue to Review (${totalImported + totalPersistedImported} transactions)`
+            : "Upload and import at least one statement"}
         </button>
       </div>
     </div>

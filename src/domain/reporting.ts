@@ -19,6 +19,7 @@ export function buildReportsFromClassifications(
     const c = row.classification;
     const amount = row.transaction.amount;
     if (!c || c.reviewStatus === "excluded") continue;
+    if (c.finalCategory.includes("Uncategorized")) continue;
 
     if (c.reportType === "P&L") {
       if (amount >= 0) add(income, c.finalCategory, amount);

@@ -30,7 +30,7 @@ export async function GET(request: Request) {
   }
 
   if (needsReview === "true") {
-    sql += ` AND (c.review_status IN ('pending', 'support_needed', 'cpa_review', 'card_statements_needed') AND (c.confidence IN ('low', 'medium') OR c.final_category IN ('Capital Improvements', 'Transfer Clearing')))`;
+    sql += ` AND (c.review_status IN ('pending', 'support_needed', 'cpa_review', 'card_statements_needed') AND (c.confidence IN ('low', 'medium') OR c.final_category IN ('Capital Improvements', 'Transfer Clearing', 'Uncategorized / Needs Review')))`;
   }
 
   if (reviewStatus) {

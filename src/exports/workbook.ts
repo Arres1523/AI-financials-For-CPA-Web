@@ -195,6 +195,7 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
       const t = input.transactions[i];
       const c = input.classifications[i];
       if (c?.reviewStatus === "excluded") continue;
+      if (c?.finalCategory?.includes("Uncategorized")) continue;
       const dt = new Date(t.date);
       const excelDate = isNaN(dt.getTime()) ? t.date : dt;
       const row = th.addRow({

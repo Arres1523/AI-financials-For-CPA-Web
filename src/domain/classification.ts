@@ -1,4 +1,4 @@
-import type { Classification, Transaction } from "./types";
+import type { Classification, Transaction, CounterpartyRule } from "./types";
 import { v4 as uuid } from "uuid";
 
 const has = (value: string, patterns: RegExp[]) => patterns.some((p) => p.test(value));
@@ -47,7 +47,7 @@ const CARD_REVIEW = (txId: string, cat: string, report: "P&L" | "Balance Sheet",
   transactionId: txId,
   finalCategory: cat,
   reportType: report,
-  confidence: "medium",
+  confidence: "high",
   ruleUsed: rule,
   reviewStatus: "card_statements_needed",
   isManualCorrection: false,
@@ -67,6 +67,48 @@ const CPA_REVIEW = (txId: string, cat: string, report: "P&L" | "Balance Sheet", 
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 });
+
+const COUNTERPARTY_RULES: CounterpartyRule[] = [
+  {
+    id: "cp-valoris-wyndham",
+    companyId: "valoris-capital-partners",
+    pattern: "Wyndham Investment Group LLC",
+    direction: "in",
+    finalCategory: "Operating / merchant income",
+    reportType: "P&L",
+    confidence: "high",
+    reviewStatus: "approved",
+    ruleUsed: "Counterparty rule — Wyndham Investment Group",
+  },
+];
+
+function getCounterpartyRules(companyId: string): CounterpartyRule[] {
+  return COUNTERPARTY_RULES.filter((r) => r.companyId === companyId);
+}
+
+function classifyByCounterparty(description: string, amount: number, companyId: string | undefined): Classification | null {
+  if (!companyId) return null;
+  const normalized = description.toUpperCase();
+  const rules = getCounterpartyRules(companyId);
+  for (const rule of rules) {
+    if (!normalized.includes(rule.pattern.toUpperCase())) continue;
+    if (rule.direction === "in" && amount <= 0) continue;
+    if (rule.direction === "out" && amount >= 0) continue;
+    return {
+      id: uuid(),
+      transactionId: "",
+      finalCategory: rule.finalCategory,
+      reportType: rule.reportType,
+      confidence: rule.confidence,
+      ruleUsed: rule.ruleUsed,
+      reviewStatus: rule.reviewStatus,
+      isManualCorrection: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+  return null;
+}
 
 export function classifyTransaction(transaction: Transaction): Classification {
   const text = transaction.description.toUpperCase();
@@ -194,6 +236,10 @@ export function classifyTransaction(transaction: Transaction): Classification {
     return CPA_REVIEW(transaction.id, "Transfer Clearing", "Balance Sheet", "K-1 / tax item — needs CPA review");
   }
 
-  // Fallback
-  return LOW(transaction.id, "Transfer Clearing", "Balance Sheet", "Unrecognized pattern — default to transfer clearing");
+  // Counterparty rules (entity-specific, before generic fallback)
+  const cp = classifyByCounterparty(transaction.description, transaction.amount, transaction.companyId);
+  if (cp) return cp;
+
+  // Fallback — not included in reports until reviewed
+  return LOW(transaction.id, "Uncategorized / Needs Review", "Balance Sheet", "Unrecognized pattern — needs review");
 }

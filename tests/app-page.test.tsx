@@ -12,9 +12,9 @@ beforeAll(() => {
 });
 
 describe("Workflow wizard page", () => {
-  it("shows the wizard header and step indicator", () => {
+  it("shows the wizard header and step indicator", async () => {
     render(<Page />);
-    expect(screen.getByText("Annual Financial Workflow")).toBeTruthy();
-    expect(screen.getByText("Company & Year")).toBeTruthy();
+    expect(await screen.findByText("Annual Financial Workflow")).toBeTruthy();
+    expect(await screen.findByText("Company & Year")).toBeTruthy();
   });
 });

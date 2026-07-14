@@ -72,10 +72,11 @@ export async function POST(request: Request) {
 
   const reports = buildReportsFromClassifications(companyName, taxYear, joined);
 
-  const flaggedTransactions = transactions.filter((_: any, i: number) =>
-    classifications[i]?.reviewStatus === "pending" ||
-    classifications[i]?.confidence === "low"
-  );
+  const flaggedTransactions = transactions.filter((_: any, i: number) => {
+    const s = classifications[i]?.reviewStatus;
+    return (s && !["approved", "excluded"].includes(s)) ||
+      classifications[i]?.confidence === "low";
+  });
 
   const accountReconData = await query(`
     SELECT a.id, a.account_name, a.opening_balance, a.closing_balance,

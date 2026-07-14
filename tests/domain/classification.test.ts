@@ -16,22 +16,23 @@ const tx = (description: string, amount: number): Transaction => ({
 });
 
 describe("classifyTransaction", () => {
-  it("keeps owner contributions off P&L", () => {
+  it("keeps capital contributions off P&L", () => {
     const c = classifyTransaction(tx("CAPITAL CONTRIBUTION OWNER", 50000));
     expect(c.reportType).toBe("Balance Sheet");
-    expect(c.finalCategory).toBe("Owner Contributions");
+    expect(c.finalCategory).toBe("Capital contributions");
   });
 
-  it("keeps credit card payments off P&L", () => {
+  it("keeps credit card payments off P&L and flags for card statements", () => {
     const c = classifyTransaction(tx("AUTOPAY AMEX PAYMENT", -3000));
     expect(c.reportType).toBe("Balance Sheet");
-    expect(c.finalCategory).toBe("Credit Card Liability");
+    expect(c.finalCategory).toBe("Credit card payable");
+    expect(c.reviewStatus).toBe("card_statements_needed");
   });
 
-  it("routes K-1 items to review", () => {
+  it("routes K-1 items to CPA review", () => {
     const c = classifyTransaction(tx("K-1 income from investment LLC", 2500));
     expect(c.reportType).toBe("Balance Sheet");
-    expect(c.reviewStatus).toBe("pending");
+    expect(c.reviewStatus).toBe("cpa_review");
   });
 
   it("classifies rental income as P&L", () => {
@@ -59,10 +60,10 @@ describe("classifyTransaction", () => {
     expect(c.finalCategory).toBe("Utilities");
   });
 
-  it("flags capital improvements for review", () => {
+  it("flags capital improvements for support needed", () => {
     const c = classifyTransaction(tx("ROOF REPAIR CAPITAL IMPROVEMENT", -5000));
     expect(c.finalCategory).toBe("Capital Improvements");
-    expect(c.reviewStatus).toBe("pending");
+    expect(c.reviewStatus).toBe("support_needed");
   });
 
   // --- P0 Bug Fix: /NSF/ word boundary ---
@@ -92,25 +93,26 @@ describe("classifyTransaction", () => {
   });
 
   // --- P0: AUTOPAY without CARD keyword ---
-  it("classifies AUTOPAY AUTO-PMT as Credit Card Liability", () => {
+  it("classifies AUTOPAY AUTO-PMT as Credit card payable", () => {
     const c = classifyTransaction(tx("AUTOPAY 2954520RAUTOPAY AUTO-PMT", -1847.83));
-    expect(c.finalCategory).toBe("Credit Card Liability");
+    expect(c.finalCategory).toBe("Credit card payable");
     expect(c.reportType).toBe("Balance Sheet");
-    expect(c.confidence).toBe("high");
+    expect(c.confidence).toBe("medium");
+    expect(c.reviewStatus).toBe("card_statements_needed");
   });
 
-  it("classifies CITI AUTOPAY as Credit Card Liability", () => {
+  it("classifies CITI AUTOPAY as Credit card payable", () => {
     const c = classifyTransaction(tx("ORIG CO NAME:CITI AUTOPAY ORIG ID:CITICARDAP DESC DATE:250131 CO ENTRY DESCR:PAYMENT SEC:WEB", -859.56));
-    expect(c.finalCategory).toBe("Credit Card Liability");
+    expect(c.finalCategory).toBe("Credit card payable");
     expect(c.reportType).toBe("Balance Sheet");
   });
 
   // --- P1: Wire Transfer rule ---
-  it("classifies domestic wire transfer as Balance Sheet pending review", () => {
+  it("classifies domestic wire transfer as Balance Sheet CPA review", () => {
     const c = classifyTransaction(tx("ONLINE DOMESTIC WIRE TRANSFER VIA: THREAD BANK/064209588 A/C: AS TRAINING LLC", -5000));
     expect(c.finalCategory).toBe("Wire Transfers");
     expect(c.reportType).toBe("Balance Sheet");
-    expect(c.reviewStatus).toBe("pending");
+    expect(c.reviewStatus).toBe("cpa_review");
   });
 
   // --- P1: Service Charges pattern ---

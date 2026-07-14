@@ -119,6 +119,11 @@ const MIGRATIONS: [string, string][] = [
     CREATE INDEX IF NOT EXISTS idx_uploaded_statements_hash ON uploaded_statements(workspace_id, file_hash);
     CREATE INDEX IF NOT EXISTS idx_transactions_fingerprint ON transactions(workspace_id, bank_account_id, date, amount);
   `],
+  ["v3_expanded_review_status", `
+    ALTER TABLE classifications DROP CONSTRAINT IF EXISTS classifications_review_status_check;
+    ALTER TABLE classifications ADD CONSTRAINT classifications_review_status_check
+      CHECK (review_status IN ('pending', 'approved', 'excluded', 'support_needed', 'cpa_review', 'card_statements_needed'));
+  `],
 ];
 
 async function initialize(): Promise<void> {

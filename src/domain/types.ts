@@ -2,7 +2,7 @@ export type ReportType = "P&L" | "Balance Sheet";
 
 export type Confidence = "high" | "medium" | "low";
 
-export type ReviewStatus = "pending" | "approved" | "excluded";
+export type ReviewStatus = "pending" | "approved" | "excluded" | "support_needed" | "cpa_review" | "card_statements_needed";
 
 export type Company = {
   id: string;

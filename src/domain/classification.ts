@@ -23,7 +23,7 @@ const MEDIUM = (txId: string, cat: string, report: "P&L" | "Balance Sheet", rule
   reportType: report,
   confidence: "medium",
   ruleUsed: rule,
-  reviewStatus: "pending",
+  reviewStatus: "support_needed",
   isManualCorrection: false,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
@@ -36,7 +36,33 @@ const LOW = (txId: string, cat: string, report: "P&L" | "Balance Sheet", rule: s
   reportType: report,
   confidence: "low",
   ruleUsed: rule,
-  reviewStatus: "pending",
+  reviewStatus: "support_needed",
+  isManualCorrection: false,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+});
+
+const CARD_REVIEW = (txId: string, cat: string, report: "P&L" | "Balance Sheet", rule: string): Classification => ({
+  id: uuid(),
+  transactionId: txId,
+  finalCategory: cat,
+  reportType: report,
+  confidence: "medium",
+  ruleUsed: rule,
+  reviewStatus: "card_statements_needed",
+  isManualCorrection: false,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+});
+
+const CPA_REVIEW = (txId: string, cat: string, report: "P&L" | "Balance Sheet", rule: string): Classification => ({
+  id: uuid(),
+  transactionId: txId,
+  finalCategory: cat,
+  reportType: report,
+  confidence: "medium",
+  ruleUsed: rule,
+  reviewStatus: "cpa_review",
   isManualCorrection: false,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
@@ -52,17 +78,17 @@ export function classifyTransaction(transaction: Transaction): Classification {
     return HIGH(transaction.id, "Transfer Clearing", "Balance Sheet", "Inter-account transfer pattern");
   }
 
-  // Balance Sheet — Wire Transfers (needs CPA review — may be capitalized or vendor cost)
+  // Balance Sheet — Wire Transfers (CPA review — may be investment, capital call, or vendor cost)
   if (has(text, [/WIRE TRANSFER/, /DOMESTIC WIRE/])) {
-    return MEDIUM(transaction.id, "Wire Transfers", "Balance Sheet", "Wire transfer — needs CPA review");
+    return CPA_REVIEW(transaction.id, "Wire Transfers", "Balance Sheet", "Wire transfer — needs CPA review");
   }
 
-  // Balance Sheet — Credit Card Liability
+  // Balance Sheet — Credit card payable (needs card statements for P&L breakdown)
   // Covers explicit card keywords and AUTOPAY patterns without CARD keyword
   if (has(text, [/AMEX/, /CREDIT CARD/, /CARDMEMBER/, /CC PAYMENT/, /AUTOPAY.*CARD/, /PAYMENT.*CARD/, /CHASE CARD/, /AUTOPAY.*AUTO.?PMT/, /AUTOPAY.*PAYMENT/, /CITI.*AUTOPAY/])) {
     return amount < 0
-      ? HIGH(transaction.id, "Credit Card Liability", "Balance Sheet", "Credit card payment pattern")
-      : MEDIUM(transaction.id, "Credit Card Liability", "Balance Sheet", "Credit card credit pattern");
+      ? CARD_REVIEW(transaction.id, "Credit card payable", "Balance Sheet", "Credit card payment pattern")
+      : CARD_REVIEW(transaction.id, "Credit card payable", "Balance Sheet", "Credit card credit pattern");
   }
 
   // P&L — ACH Income (ACH signature/test deposits, before VALORIS to avoid company-name false positive)
@@ -70,19 +96,19 @@ export function classifyTransaction(transaction: Transaction): Classification {
     return HIGH(transaction.id, "Other Income", "P&L", "ACH signature deposit pattern");
   }
 
-  // Balance Sheet — Owner Contributions
+  // Balance Sheet — Capital contributions
   if (has(text, [/CONTRIBUTION/, /CAPITAL CALL/, /OWNER FUNDING/, /MEMBER FUNDING/, /OWNER DEPOSIT/]) && amount > 0) {
-    return HIGH(transaction.id, "Owner Contributions", "Balance Sheet", "Owner contribution pattern");
+    return HIGH(transaction.id, "Capital contributions", "Balance Sheet", "Owner contribution pattern");
   }
 
-  // Balance Sheet — Owner Distributions
+  // Balance Sheet — Member distributions
   if (has(text, [/DISTRIBUTION/, /DRAW/, /OWNER PAY/, /MEMBER DISTRIBUTION/, /OWNER WITHDRAW/]) && amount < 0) {
-    return HIGH(transaction.id, "Owner Distributions", "Balance Sheet", "Owner distribution pattern");
+    return HIGH(transaction.id, "Member distributions", "Balance Sheet", "Owner distribution pattern");
   }
 
-  // Balance Sheet — Due To/From Related Parties
+  // Balance Sheet — Due From/To Related Parties (Support Needed)
   if (has(text, [/VALORIS/, /RELATED PARTY/, /INTERCOMPANY/, /AFFILIATE/])) {
-    const cat = amount < 0 ? "Due From Related Parties" : "Due To Related Parties";
+    const cat = amount < 0 ? "Due from related parties" : "Due to related parties";
     return amount < 0
       ? MEDIUM(transaction.id, cat, "Balance Sheet", "Related party payment (outgoing)")
       : MEDIUM(transaction.id, cat, "Balance Sheet", "Related party receipt (incoming)");
@@ -163,9 +189,9 @@ export function classifyTransaction(transaction: Transaction): Classification {
     return MEDIUM(transaction.id, "Other Expense", "P&L", "Other operating expense pattern");
   }
 
-  // K-1 / Tax items → review
-  if (has(text, [/\BK-?1\b/, /TAX BASIS/, /AT-?RISK/, /TAX CAPITAL/, /SCHEDULE K/])) {
-    return LOW(transaction.id, "Transfer Clearing", "Balance Sheet", "K-1 / tax item — needs CPA review");
+  // K-1 / Tax items → CPA review
+  if (has(text, [/\bK-?1\b/, /TAX BASIS/, /AT-?RISK/, /TAX CAPITAL/, /SCHEDULE K/])) {
+    return CPA_REVIEW(transaction.id, "Transfer Clearing", "Balance Sheet", "K-1 / tax item — needs CPA review");
   }
 
   // Fallback

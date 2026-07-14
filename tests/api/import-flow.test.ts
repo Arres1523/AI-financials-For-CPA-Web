@@ -190,18 +190,19 @@ describe("Classification after import", () => {
     expect(classifications[1].reportType).toBe("P&L");
 
     // Capital Contribution → Balance Sheet / high / approved
-    expect(classifications[2].finalCategory).toBe("Owner Contributions");
+    expect(classifications[2].finalCategory).toBe("Capital contributions");
     expect(classifications[2].reportType).toBe("Balance Sheet");
 
-    // AMEX payment → Balance Sheet / high / approved
-    expect(classifications[3].finalCategory).toBe("Credit Card Liability");
+    // AMEX payment → Balance Sheet / medium / card_statements_needed
+    expect(classifications[3].finalCategory).toBe("Credit card payable");
     expect(classifications[3].reportType).toBe("Balance Sheet");
+    expect(classifications[3].reviewStatus).toBe("card_statements_needed");
 
-    // Capital Improvement → Balance Sheet / low / pending
+    // Capital Improvement → Balance Sheet / low / support_needed
     expect(classifications[4].finalCategory).toBe("Capital Improvements");
     expect(classifications[4].reportType).toBe("Balance Sheet");
     expect(classifications[4].confidence).toBe("low");
-    expect(classifications[4].reviewStatus).toBe("pending");
+    expect(classifications[4].reviewStatus).toBe("support_needed");
 
     // Legal → P&L
     expect(classifications[5].finalCategory).toBe("Legal & Accounting");

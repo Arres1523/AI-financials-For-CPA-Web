@@ -24,7 +24,10 @@ export function buildMemoModel(pkg: CpaPackage, classifications: TransactionWith
     .map((item) => item.memoNote.trim() || item.label);
 
   const openReviewItems = classifications
-    .filter((row) => row.classification?.reviewStatus === "pending")
+    .filter((row) => {
+      const s = row.classification?.reviewStatus;
+      return s && !["approved", "excluded"].includes(s);
+    })
     .map((row) => `${row.date} - ${row.description}: ${row.classification?.finalCategory}`);
 
   if (Math.abs(pkg.balanceCheck ?? 0) > 0.01 && pkg.balanceCheckExplanation.trim()) {

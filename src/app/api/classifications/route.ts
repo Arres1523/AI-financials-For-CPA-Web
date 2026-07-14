@@ -54,9 +54,9 @@ export async function POST(request: Request) {
 
 function deriveReportType(category: string): "P&L" | "Balance Sheet" {
   const bsCategories = [
-    "Transfer Clearing", "Credit Card Liability", "Owner Contributions", "Owner Distributions",
-    "Due To Related Parties", "Due From Related Parties", "Loan Liability", "Capital Improvements",
-    "Cash",
+    "Transfer Clearing", "Credit card payable", "Capital contributions", "Member distributions",
+    "Due to related parties", "Due from related parties", "Loan Liability", "Capital Improvements",
+    "Cash", "Wire Transfers",
   ];
   return bsCategories.includes(category) ? "Balance Sheet" : "P&L";
 }

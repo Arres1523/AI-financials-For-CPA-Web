@@ -39,10 +39,10 @@ describe("buildReports", () => {
   it("keeps balance-sheet activity out of P&L", () => {
     const reports = buildReports("Demo LLC", 2025, [
       make("1", "Rent", 1000, "Rental Income", "P&L"),
-      make("2", "Contribution", 5000, "Owner Contributions", "Balance Sheet"),
+      make("2", "Contribution", 5000, "Capital contributions", "Balance Sheet"),
     ]);
     expect(reports.pnl.netIncome).toBe(1000);
-    expect(reports.balanceSheet.equity["Owner Contributions"]).toBe(5000);
+    expect(reports.balanceSheet.equity["Capital contributions"]).toBe(5000);
   });
 
   it("shows balance check when BS doesn't balance", () => {

@@ -22,12 +22,13 @@ async function json(method: string, url: string, body?: unknown) {
 // Integration tests: run in CI or when INTEGRATION=true is set.
 // Requires a dev server on port 3001 with a test database.
 describe.runIf(!!process.env.CI || !!process.env.INTEGRATION)("Import API integration", () => {
+  const runId = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`;
   let companyId: string;
   let workspaceId: string;
   let accountId: string;
 
   it("creates a company", async () => {
-    const { status, data } = await json("POST", "/api/companies", { legalName: "Import Test LLC" });
+    const { status, data } = await json("POST", "/api/companies", { legalName: `Import Test LLC ${runId}` });
     expect(status).toBe(200);
     companyId = data.id;
   });

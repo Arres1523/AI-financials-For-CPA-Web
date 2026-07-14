@@ -98,8 +98,14 @@ export default function ResultsStep({ workspace, company, accounts, reconciliati
         </div>
         <div className="rounded border border-line p-3">
           <p className="text-xs text-slate-500">Classification</p>
-          <p className={`text-2xl font-semibold ${reports.classificationCompleteness.status === "complete" ? "text-sage" : "text-brass"}`}>
-            {reports.classificationCompleteness.approved}/{reports.classificationCompleteness.totalTransactions}
+          <p className={`text-2xl font-semibold ${reports.classificationCompleteness.classified === reports.classificationCompleteness.totalTransactions ? "text-sage" : "text-brass"}`}>
+            {reports.classificationCompleteness.classified}/{reports.classificationCompleteness.totalTransactions}
+          </p>
+        </div>
+        <div className="rounded border border-line p-3">
+          <p className="text-xs text-slate-500">Documentation</p>
+          <p className={`text-2xl font-semibold ${reports.classificationCompleteness.documentationComplete === reports.classificationCompleteness.totalTransactions ? "text-sage" : "text-brass"}`}>
+            {reports.classificationCompleteness.documentationComplete}/{reports.classificationCompleteness.totalTransactions}
           </p>
         </div>
         <div className="rounded border border-line p-3">
@@ -126,10 +132,16 @@ export default function ResultsStep({ workspace, company, accounts, reconciliati
           <p>One or more bank accounts have unreconciled transactions. The balance sheet may be inaccurate.</p>
         </div>
       )}
-      {reports.classificationCompleteness.status === "incomplete" && (
+      {reports.classificationCompleteness.classified < reports.classificationCompleteness.totalTransactions && (
         <div className="rounded border border-brass/30 bg-brass/5 p-4 text-sm text-brass">
           <p className="font-medium">⚠ Classification Incomplete</p>
-          <p>{reports.classificationCompleteness.approved} of {reports.classificationCompleteness.totalTransactions} transactions have been classified. Unclassified transactions may affect the financial statements.</p>
+          <p>{reports.classificationCompleteness.classified} of {reports.classificationCompleteness.totalTransactions} transactions classified. {reports.classificationCompleteness.totalTransactions - reports.classificationCompleteness.classified} need classification.</p>
+        </div>
+      )}
+      {reports.classificationCompleteness.documentationPending > 0 && reports.classificationCompleteness.classified === reports.classificationCompleteness.totalTransactions && (
+        <div className="rounded border border-brass/30 bg-brass/5 p-4 text-sm text-brass">
+          <p className="font-medium">⚠ Documentation Pending</p>
+          <p>{reports.classificationCompleteness.documentationPending} transaction(s) need supporting documents (card statements, CPA review, or support).</p>
         </div>
       )}
       {reports.accountingEquation.status !== "passed" && (

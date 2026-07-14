@@ -12,7 +12,7 @@ const minimalReport: FinancialReport = {
   pnl: { income: {}, expenses: {}, netIncome: 0 },
   balanceSheet: { assets: {}, liabilities: {}, equity: {}, balanceCheck: 0 },
   bankReconciliation: [],
-  classificationCompleteness: { totalTransactions: 0, approved: 0, excluded: 0, unresolved: 0, unresolvedAmount: 0, suspenseAmount: 0, status: "complete" },
+  classificationCompleteness: { totalTransactions: 0, approved: 0, excluded: 0, unresolved: 0, unresolvedAmount: 0, suspenseAmount: 0, status: "complete", classified: 0, documentationComplete: 0, documentationPending: 0 },
   accountingEquation: { totalAssets: 0, totalLiabilities: 0, totalEquity: 0, difference: 0, status: "passed", missingInputs: [] },
   suspense: [],
   actualCash: 0,
@@ -20,6 +20,9 @@ const minimalReport: FinancialReport = {
   totalCashVariance: 0,
   matchedTransferCount: 0,
   matchedTransferAmount: 0,
+  openingCash: 0,
+  totalInflows: 0,
+  totalOutflows: 0,
 };
 
 const minimalInput: WorkbookExportInput = {
@@ -41,12 +44,28 @@ async function buildAndLoad(input: WorkbookExportInput = minimalInput) {
 }
 
 describe("buildWorkbookBuffer", () => {
-  it("creates P&L and Balance Sheet sheets with optional Transaction History", async () => {
+  it("creates P&L and Reconciliation sheets with optional Transaction History", async () => {
     const workbook = await buildAndLoad();
     const names = workbook.worksheets.map((s) => s.name);
     expect(names).toContain(`P&L 2025`);
-    expect(names).toContain("Balance Sheet");
+    expect(names).toContain("Reconciliation");
     expect(names).not.toContain("Transaction History");
+  });
+
+  it("omits Balance Sheet in classified_bank_activity mode", async () => {
+    const workbook = await buildAndLoad();
+    const names = workbook.worksheets.map((s) => s.name);
+    expect(names).not.toContain("Balance Sheet");
+  });
+
+  it("includes Balance Sheet in preliminary_balance_sheet mode", async () => {
+    const input: WorkbookExportInput = {
+      ...minimalInput,
+      reports: { ...minimalReport, mode: "preliminary_balance_sheet" },
+    };
+    const workbook = await buildAndLoad(input);
+    const names = workbook.worksheets.map((s) => s.name);
+    expect(names).toContain("Balance Sheet");
   });
 
   it("includes Transaction History sheet when requested", async () => {
@@ -63,7 +82,10 @@ describe("buildWorkbookBuffer", () => {
   });
 
   it("sets Balance Sheet column widths", async () => {
-    const workbook = await buildAndLoad();
+    const workbook = await buildAndLoad({
+      ...minimalInput,
+      reports: { ...minimalReport, mode: "preliminary_balance_sheet" },
+    });
     const bs = workbook.getWorksheet("Balance Sheet")!;
     expect(bs.getColumn(1).width).toBeGreaterThanOrEqual(45);
     expect(bs.getColumn(2).width).toBeGreaterThanOrEqual(22);
@@ -80,7 +102,10 @@ describe("buildWorkbookBuffer", () => {
   });
 
   it("sets warning row height and wrapText on Balance Sheet", async () => {
-    const workbook = await buildAndLoad();
+    const workbook = await buildAndLoad({
+      ...minimalInput,
+      reports: { ...minimalReport, mode: "preliminary_balance_sheet" },
+    });
     const bs = workbook.getWorksheet("Balance Sheet")!;
     expect(bs.getRow(4).height).toBeGreaterThanOrEqual(30);
     expect(bs.getCell("A4").alignment?.wrapText).toBe(true);

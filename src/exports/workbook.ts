@@ -4,6 +4,12 @@ import { reconcileAccountPeriod } from "../domain/reconciliation";
 
 const fmt = "$#,##0.00;($#,##0.00);-";
 
+const MODE_LABELS: Record<string, string> = {
+  "classified_bank_activity": "Classified Bank Activity",
+  "preliminary_balance_sheet": "Preliminary Balance Sheet",
+  "complete_balance_sheet": "Complete Balance Sheet",
+};
+
 function bold(cell: ExcelJS.Cell) {
   cell.font = { bold: true, size: 11 };
 }
@@ -41,7 +47,7 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
   headerRow(statusSheet.getCell("A1"), "Report Status");
   statusSheet.mergeCells("A1:E1");
 
-  statusSheet.addRow(["Mode", input.reports.mode]);
+  statusSheet.addRow(["Mode", MODE_LABELS[input.reports.mode] ?? input.reports.mode]);
   statusSheet.addRow([]);
 
   statusSheet.addRow(["Check", "Actual", "Expected", "Difference", "Status"]);
@@ -52,7 +58,9 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
   const totalAccounts = input.reports.bankReconciliation.length;
   statusSheet.addRow(["Bank Reconciliation", `${reconciledCount}/${totalAccounts}`, "All reconciled", "", reconciledCount === totalAccounts ? "✓" : "✕"]);
 
-  statusSheet.addRow(["Classification", `${input.reports.classificationCompleteness.approved}/${input.reports.classificationCompleteness.totalTransactions} approved`, "All classified", `${input.reports.classificationCompleteness.unresolved} unresolved`, input.reports.classificationCompleteness.status === "complete" ? "✓" : "✕"]);
+  statusSheet.addRow(["Classification", `${input.reports.classificationCompleteness.classified}/${input.reports.classificationCompleteness.totalTransactions} classified`, "All classified", `${input.reports.classificationCompleteness.totalTransactions - input.reports.classificationCompleteness.classified} needs classification`, input.reports.classificationCompleteness.classified === input.reports.classificationCompleteness.totalTransactions ? "✓" : "✕"]);
+
+  statusSheet.addRow(["Documentation", `${input.reports.classificationCompleteness.documentationComplete}/${input.reports.classificationCompleteness.totalTransactions} complete`, "All docs complete", `${input.reports.classificationCompleteness.documentationPending} pending`, input.reports.classificationCompleteness.documentationComplete === input.reports.classificationCompleteness.totalTransactions ? "✓" : "✕"]);
 
   statusSheet.addRow(["Accounting Equation", input.reports.accountingEquation.difference, "0", input.reports.accountingEquation.difference, input.reports.accountingEquation.status === "passed" ? "✓" : "✕"]);
 
@@ -137,11 +145,11 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
     cba.mergeCells("A3:B3");
 
     cba.addRow([]);
-    cba.addRow(["Cash Summary", ""]);
+    cba.addRow(["Cash Rollforward", ""]);
     bold(cba.getCell("A5"));
-    cba.addRow(["Opening Cash", input.reports.expectedCash - input.reports.pnl.netIncome]);
-    cba.addRow(["Plus: Inflows", Object.values(input.reports.pnl.income).reduce((s: number, v: number) => s + v, 0)]);
-    cba.addRow(["Less: Outflows", Object.values(input.reports.pnl.expenses).reduce((s: number, v: number) => s + v, 0)]);
+    cba.addRow(["Opening Cash", input.reports.openingCash]);
+    cba.addRow(["Plus: Inflows", input.reports.totalInflows]);
+    cba.addRow(["Less: Outflows", input.reports.totalOutflows]);
     const calcRow = cba.rowCount + 1;
     cba.addRow(["Calculated Ending Cash", { formula: `B6+B7-B8` }]);
     bold(cba.getCell(`A${calcRow}`));
@@ -153,7 +161,8 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
     }
   }
 
-  // ─── Preliminary Balance Sheet from Bank Activity ──────────
+  // ─── Balance Sheet (only when sufficient data exists) ───────
+  if (input.reports.mode !== "classified_bank_activity") {
   const bs = workbook.addWorksheet("Balance Sheet", { views: [{ state: "frozen", xSplit: 0, ySplit: 1, showGridLines: false }] });
   bs.getColumn(1).width = 45;
   bs.getColumn(2).width = 22;
@@ -227,25 +236,6 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
     bs.getRow(bs.rowCount).height = 30;
   }
 
-  // ─── Reconciliation Summary ─────────────────────────────────
-  const reconRows = bs.rowCount + 2;
-  bs.addRow([]);
-  bs.addRow(["RECONCILIATION BY ACCOUNT"]);
-  bold(bs.getCell(`A${reconRows + 1}`));
-  bs.mergeCells(`A${bs.rowCount}:G${bs.rowCount}`);
-  bs.addRow(["Account", "Opening", "Movement", "Expected Close", "Closing", "Variance", "Status"]);
-  const reconHeader = bs.rowCount;
-  for (let c = 1; c <= 7; c++) bold(bs.getCell(reconHeader, c));
-
-  for (const acct of input.accountReconData) {
-    const r = reconcileAccountPeriod(acct.opening_balance, acct.closing_balance, input.transactions.filter((t: Transaction) => t.bankAccountId === acct.id));
-    const row = bs.addRow([acct.account_name, r.openingBalance, r.movementTotal, r.expectedClosingBalance, r.closingBalance, r.variance, r.status]);
-    for (let c = 2; c <= 6; c++) row.getCell(c).numFmt = fmt;
-    if (r.status === "unreconciled") {
-      row.getCell(7).font = { color: { argb: "CC0000" } };
-    }
-  }
-
   // Always show disclaimer — this report is preliminary by design
   bs.addRow([]);
   bs.addRow(["⚠ These financial statements are PRELIMINARY. They were generated solely from"]);
@@ -256,6 +246,31 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
   for (let r = bs.rowCount - 4; r <= bs.rowCount; r++) {
     bs.getCell(`A${r}`).font = { italic: true, color: { argb: "666666" } };
     bs.getCell(`A${r}`).alignment = { wrapText: true };
+  }
+
+  } // end if (not classified_bank_activity)
+
+  // ─── Reconciliation sheet ────────────────────────────────────
+  const reconSheet = workbook.addWorksheet("Reconciliation", { views: [{ state: "frozen", xSplit: 0, ySplit: 1 }] });
+  reconSheet.getColumn(1).width = 30;
+  reconSheet.getColumn(2).width = 18;
+  reconSheet.getColumn(3).width = 18;
+  reconSheet.getColumn(4).width = 18;
+  reconSheet.getColumn(5).width = 18;
+  reconSheet.getColumn(6).width = 18;
+  reconSheet.getColumn(7).width = 14;
+
+  headerRow(reconSheet.getCell("A1"), "Reconciliation by Account");
+  reconSheet.mergeCells("A1:G1");
+  reconSheet.addRow(["Account", "Opening", "Movement", "Expected Close", "Closing", "Variance", "Status"]);
+  const reconHdr = reconSheet.rowCount;
+  for (let c = 1; c <= 7; c++) bold(reconSheet.getCell(reconHdr, c));
+
+  for (const acct of input.accountReconData) {
+    const r = reconcileAccountPeriod(acct.opening_balance, acct.closing_balance, input.transactions.filter((t: Transaction) => t.bankAccountId === acct.id));
+    const row = reconSheet.addRow([acct.account_name, r.openingBalance, r.movementTotal, r.expectedClosingBalance, r.closingBalance, r.variance, r.status]);
+    for (let c = 2; c <= 6; c++) row.getCell(c).numFmt = fmt;
+    if (r.status === "unreconciled") row.getCell(7).font = { color: { argb: "CC0000" } };
   }
 
   // ─── Suspense Detail ────────────────────────────────────────

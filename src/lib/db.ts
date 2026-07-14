@@ -8,6 +8,10 @@ function getConnectionString(): string {
   if (!url) {
     throw new Error("DATABASE_URL environment variable is not configured");
   }
+  if (process.env.DATABASE_URL_TEST && process.env.DATABASE_URL_TEST === url) {
+    console.error("REFUSING TO RUN: DATABASE_URL_TEST equals DATABASE_URL. Use a separate test database.");
+    process.exit(1);
+  }
   return url;
 }
 

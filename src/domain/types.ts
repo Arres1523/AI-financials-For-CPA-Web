@@ -176,6 +176,9 @@ export type ClassificationCompletenessCheck = {
   unresolvedAmount: number;
   suspenseAmount: number;
   status: "complete" | "incomplete";
+  classified: number;
+  documentationComplete: number;
+  documentationPending: number;
 };
 
 export type AccountingEquationCheck = {
@@ -240,6 +243,9 @@ export type FinancialReport = {
   totalCashVariance: number;
   matchedTransferCount: number;
   matchedTransferAmount: number;
+  openingCash: number;
+  totalInflows: number;
+  totalOutflows: number;
 };
 
 export type ColumnMapping = {

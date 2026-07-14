@@ -1,6 +1,8 @@
 import type { Classification, PnlReport, BalanceSheetReport, ReportPackage, TransactionWithClassification, BankAccount, BankReconciliationCheck, ClassificationCompletenessCheck, AccountingEquationCheck, FinancialReportMode, FinancialReport, SuspenseItem, Transaction } from "./types";
 import { reconcileAccountPeriod } from "./reconciliation";
 import { matchInternalTransfers } from "./transferMatching";
+import { buildCashRollforward } from "./cashRollforward";
+import { getClassificationStatus, getDocumentationStatus } from "./classificationStatus";
 
 const cents = (v: number) => Math.round(v * 100) / 100;
 
@@ -91,6 +93,11 @@ export function buildClassificationCompleteness(classifications: Classification[
   const unresolvedStatuses = ["pending", "support_needed", "cpa_review", "card_statements_needed"];
   const unresolved = classifications.filter(c => unresolvedStatuses.includes(c.reviewStatus));
   const suspense = classifications.filter(c => c.finalCategory?.includes("Uncategorized") || c.reviewStatus === "pending");
+
+  const classified = classifications.filter(c => getClassificationStatus(c) === "classified").length;
+  const documentationComplete = classifications.filter(c => getDocumentationStatus(c) === "complete").length;
+  const documentationPending = total - excluded - documentationComplete;
+
   return {
     totalTransactions: total,
     approved,
@@ -99,6 +106,9 @@ export function buildClassificationCompleteness(classifications: Classification[
     unresolvedAmount: cents(unresolved.reduce((s, c) => s + Math.abs(0), 0)),
     suspenseAmount: cents(suspense.reduce((s, c) => s + Math.abs(0), 0)),
     status: unresolved.length > 0 ? "incomplete" : "complete",
+    classified,
+    documentationComplete,
+    documentationPending,
   };
 }
 
@@ -225,12 +235,12 @@ export function buildFinancialReport(
       reason: c.ruleUsed ?? "Unresolved classification",
     }));
 
-  // Cash from real balances
-  const actualCash = cents(accounts.reduce((s, a) => s + (a.closingBalance ?? 0), 0));
-  const movementTotal = cents(transactions.reduce((s, t) => s + t.amount, 0));
-  const openingCash = cents(accounts.reduce((s, a) => s + (a.openingBalance ?? 0), 0));
-  const expectedCash = cents(openingCash + movementTotal);
-  const totalCashVariance = cents(actualCash - expectedCash);
+  // Cash rollforward from real balances (no plugs)
+  const rf = buildCashRollforward(
+    accounts.map(a => a.openingBalance),
+    accounts.map(a => a.closingBalance),
+    transactions.map(t => t.amount)
+  );
 
   return {
     mode,
@@ -243,9 +253,12 @@ export function buildFinancialReport(
     classificationCompleteness,
     accountingEquation,
     suspense,
-    actualCash,
-    expectedCash,
-    totalCashVariance,
+    actualCash: rf.actualCash,
+    expectedCash: rf.calculatedEndingCash,
+    totalCashVariance: rf.variance,
+    openingCash: rf.openingCash,
+    totalInflows: rf.totalInflows,
+    totalOutflows: rf.totalOutflows,
     matchedTransferCount: matchedResult.matchedPairs.length,
     matchedTransferAmount: matchedAmount,
   };

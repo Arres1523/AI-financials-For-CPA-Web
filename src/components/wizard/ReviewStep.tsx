@@ -4,17 +4,46 @@ import React from "react";
 import { useState, useEffect, useCallback } from "react";
 import type { TransactionWithClassification, Workspace } from "@/domain/types";
 import { requiresReview } from "@/domain/reviewPolicy";
-
-const CATEGORIES_BY_REPORT: Record<string, string[]> = {
-  "P&L": ["Rental Income", "Other Income", "Repairs & Maintenance", "Utilities", "Insurance", "Property Taxes", "Legal & Accounting", "Management Fees", "Bank Fees", "Interest Expense", "Rent Expense", "Other Expense"],
-  "Balance Sheet": ["Cash", "Credit Card Liability", "Loan Liability", "Owner Contributions", "Owner Distributions", "Due To Related Parties", "Due From Related Parties", "Transfer Clearing", "Capital Improvements"],
-};
+import { getCategoriesByReport, isValidCategory } from "@/domain/categoryOptions";
 
 type Props = {
   workspace: Workspace;
   onComplete: () => void;
   onBack?: () => void;
 };
+
+function CategorySelect({ currentCategory, onChange }: { currentCategory: string; onChange: (cat: string) => void }) {
+  const [displayValue, setDisplayValue] = React.useState("");
+  const isKnown = isValidCategory(currentCategory);
+
+  React.useEffect(() => {
+    setDisplayValue(isKnown ? currentCategory : "__unknown__");
+  }, [currentCategory, isKnown]);
+
+  return (
+    <select
+      className="rounded border border-line px-2 py-1 text-xs max-w-[160px]"
+      value={displayValue}
+      onChange={(e) => onChange(e.target.value)}
+    >
+      {!isKnown && currentCategory && (
+        <option value="__unknown__" disabled>
+          {currentCategory} (unknown — select one)
+        </option>
+      )}
+      <optgroup label="P&L">
+        {getCategoriesByReport("P&L").map((cat) => (
+          <option key={cat} value={cat}>{cat}</option>
+        ))}
+      </optgroup>
+      <optgroup label="Balance Sheet">
+        {getCategoriesByReport("Balance Sheet").map((cat) => (
+          <option key={cat} value={cat}>{cat}</option>
+        ))}
+      </optgroup>
+    </select>
+  );
+}
 
 export default function ReviewStep({ workspace, onComplete, onBack }: Props) {
   const [items, setItems] = useState<TransactionWithClassification[]>([]);
@@ -171,22 +200,10 @@ export default function ReviewStep({ workspace, onComplete, onBack }: Props) {
                       <td className="px-3 py-2 max-w-[280px] truncate" title={t.description}>{t.description}</td>
                       <td className={`px-3 py-2 money ${t.amount < 0 ? "text-red-600" : "text-sage"}`}>${t.amount.toFixed(2)}</td>
                       <td className="px-3 py-2">
-                        <select
-                          className="rounded border border-line px-2 py-1 text-xs max-w-[160px]"
-                          value={c?.finalCategory ?? ""}
-                          onChange={(e) => handleAction("approve", [t.id], e.target.value)}
-                        >
-                          <optgroup label="P&L">
-                            {CATEGORIES_BY_REPORT["P&L"].map((cat) => (
-                              <option key={cat} value={cat}>{cat}</option>
-                            ))}
-                          </optgroup>
-                          <optgroup label="Balance Sheet">
-                            {CATEGORIES_BY_REPORT["Balance Sheet"].map((cat) => (
-                              <option key={cat} value={cat}>{cat}</option>
-                            ))}
-                          </optgroup>
-                        </select>
+                        <CategorySelect
+                          currentCategory={c?.finalCategory ?? ""}
+                          onChange={(cat) => handleAction("approve", [t.id], cat)}
+                        />
                       </td>
                       <td className="px-3 py-2">
                         <span className={`text-xs font-medium ${

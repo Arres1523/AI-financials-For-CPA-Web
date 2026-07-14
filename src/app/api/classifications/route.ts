@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { query, queryOne, withTransaction } from "@/lib/db";
 import { v4 as uuid } from "uuid";
+import { CATEGORY_OPTIONS } from "@/domain/categoryOptions";
 
 export const runtime = "nodejs";
 
@@ -53,10 +54,7 @@ export async function POST(request: Request) {
 }
 
 function deriveReportType(category: string): "P&L" | "Balance Sheet" {
-  const bsCategories = [
-    "Transfer Clearing", "Credit card payable", "Capital contributions", "Member distributions",
-    "Due to related parties", "Due from related parties", "Loan Liability", "Capital Improvements",
-    "Cash", "Wire Transfers",
-  ];
-  return bsCategories.includes(category) ? "Balance Sheet" : "P&L";
+  const found = CATEGORY_OPTIONS.find((o) => o.value === category);
+  if (found) return found.reportType;
+  return "Balance Sheet";
 }

@@ -133,7 +133,7 @@ const MIGRATIONS: [string, string][] = [
       amount REAL NOT NULL DEFAULT 0,
       source TEXT NOT NULL DEFAULT 'manual',
       support_status TEXT NOT NULL DEFAULT 'provided' CHECK (support_status IN ('provided', 'missing', 'reviewed')),
-      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
     CREATE INDEX IF NOT EXISTS idx_opening_balance_entries_workspace ON opening_balance_entries(workspace_id);
   `],

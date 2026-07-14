@@ -18,6 +18,8 @@ const minimalReport: FinancialReport = {
   actualCash: 0,
   expectedCash: 0,
   totalCashVariance: 0,
+  matchedTransferCount: 0,
+  matchedTransferAmount: 0,
 };
 
 const minimalInput: WorkbookExportInput = {

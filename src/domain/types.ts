@@ -238,6 +238,8 @@ export type FinancialReport = {
   actualCash: number;
   expectedCash: number;
   totalCashVariance: number;
+  matchedTransferCount: number;
+  matchedTransferAmount: number;
 };
 
 export type ColumnMapping = {

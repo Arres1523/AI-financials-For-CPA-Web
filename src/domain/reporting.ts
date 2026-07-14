@@ -1,5 +1,6 @@
-import type { Classification, PnlReport, BalanceSheetReport, ReportPackage, TransactionWithClassification, BankAccount, BankReconciliationCheck, ClassificationCompletenessCheck, AccountingEquationCheck, FinancialReportMode, FinancialReport, SuspenseItem } from "./types";
+import type { Classification, PnlReport, BalanceSheetReport, ReportPackage, TransactionWithClassification, BankAccount, BankReconciliationCheck, ClassificationCompletenessCheck, AccountingEquationCheck, FinancialReportMode, FinancialReport, SuspenseItem, Transaction } from "./types";
 import { reconcileAccountPeriod } from "./reconciliation";
+import { matchInternalTransfers } from "./transferMatching";
 
 const cents = (v: number) => Math.round(v * 100) / 100;
 
@@ -159,8 +160,8 @@ export function determineFinancialReportMode(
 export function buildFinancialReport(
   entityName: string,
   taxYear: number,
-  accounts: Pick<BankAccount, "id" | "openingBalance" | "closingBalance" | "accountName">[],
-  transactions: { amount: number; bankAccountId: string }[],
+  accounts: Pick<BankAccount, "id" | "openingBalance" | "closingBalance" | "accountName" | "companyId">[],
+  transactions: Transaction[],
   classifications: Classification[]
 ): FinancialReport {
   // Compute P&L and BS using the existing logic but extracting totals
@@ -181,12 +182,31 @@ export function buildFinancialReport(
   const allAccountsReconciled = bankReconciliation.every(r => r.status === "reconciled");
   const openingBalancesExist = accounts.some(a => a.openingBalance !== 0);
 
+  // Match internal transfers
+  const companyId = accounts[0]?.companyId ?? "";
+  const matchedTransfers = matchInternalTransfers(
+    transactions,
+    accounts.map(a => a.id),
+    companyId
+  );
+
   const totalAssets = Object.values(balanceSheet.assets).reduce((s, v) => s + v, 0);
   const totalLiabilities = Object.values(balanceSheet.liabilities).reduce((s, v) => s + v, 0);
   const totalEquity = Object.values(balanceSheet.equity).reduce((s, v) => s + v, 0);
 
+  // Exclude matched transfers from BS totals
+  const matchedAmount = cents(matchedTransfers.matchedPairs.reduce((s, p) => s + p.amount, 0));
+  const adjustedAssets = { ...balanceSheet.assets };
+  for (const key of Object.keys(adjustedAssets)) {
+    if (key.toLowerCase().includes("transfer")) {
+      adjustedAssets[key] = cents((adjustedAssets[key] ?? 0) - matchedAmount);
+      if (Math.abs(adjustedAssets[key]) <= 0.01) delete adjustedAssets[key];
+    }
+  }
+  const totalAdjustedAssets = Object.values(adjustedAssets).reduce((s, v) => s + v, 0);
+
   const accountingEquation = buildAccountingEquation(
-    totalAssets, totalLiabilities, totalEquity,
+    totalAdjustedAssets, totalLiabilities, totalEquity,
     openingBalancesExist, hasSuspense, hasCardStatementsNeeded
   );
 
@@ -229,5 +249,7 @@ export function buildFinancialReport(
     actualCash,
     expectedCash,
     totalCashVariance,
+    matchedTransferCount: matchedTransfers.matchedPairs.length,
+    matchedTransferAmount: matchedAmount,
   };
 }

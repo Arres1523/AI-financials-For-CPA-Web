@@ -1,0 +1,10 @@
+{
+  "accentColor": "#5d7668",
+  "cssTheme": "",
+  "baseFontSize": 16,
+  "interfaceFontFamily": "Inter, -apple-system, sans-serif",
+  "textFontFamily": "Inter, -apple-system, sans-serif",
+  "monospaceFontFamily": "JetBrains Mono, SF Mono, Menlo, monospace",
+  "showViewHeader": true,
+  "translucency": false
+}

@@ -1,0 +1,14 @@
+{
+  "alwaysUpdateLinks": true,
+  "newFileLocation": "current",
+  "useMarkdownLinks": true,
+  "showUnsupportedFiles": false,
+  "attachmentFolderPath": "./assets",
+  "promptDelete": false,
+  "tabSize": 2,
+  "useTab": false,
+  "legacyEditor": false,
+  "livePreview": true,
+  "spellcheck": true,
+  "spellcheckLanguages": ["en", "es"]
+}

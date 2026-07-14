@@ -1,8 +1,18 @@
 import ExcelJS from "exceljs";
 import type { Classification, FinancialReport, Transaction } from "../domain/types";
 import { reconcileAccountPeriod } from "../domain/reconciliation";
+import { getClassificationStatus, getDocumentationStatus } from "../domain/classificationStatus";
 
 const fmt = "$#,##0.00;($#,##0.00);-";
+
+const REVIEW_NOTES: Record<string, string> = {
+  pending: "Pending review",
+  approved: "Approved",
+  excluded: "Excluded from report",
+  support_needed: "Supporting documentation needed",
+  cpa_review: "Requires CPA review",
+  card_statements_needed: "Card statements needed",
+};
 
 const MODE_LABELS: Record<string, string> = {
   "classified_bank_activity": "Classified Bank Activity",
@@ -294,12 +304,25 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
 
   // ─── Transaction History (optional) ─────────────────────────
   if (input.includeTransactions) {
+    const accountMap = new Map<string, string>();
+    for (const a of input.accountReconData) {
+      accountMap.set(a.id, a.account_name);
+    }
+
     const th = workbook.addWorksheet("Transaction History", { views: [{ state: "frozen", xSplit: 0, ySplit: 1, showGridLines: false }] });
     th.columns = [
       { header: "Date", key: "date", width: 16 },
-      { header: "Description", key: "description", width: 60 },
+      { header: "Bank Account", key: "bankAccount", width: 22 },
+      { header: "Description", key: "description", width: 55 },
       { header: "Amount", key: "amount", width: 18 },
-      { header: "Final Category", key: "finalCategory", width: 32 },
+      { header: "Final Category", key: "finalCategory", width: 30 },
+      { header: "Report Type", key: "reportType", width: 16 },
+      { header: "Confidence", key: "confidence", width: 14 },
+      { header: "Rule Used", key: "ruleUsed", width: 28 },
+      { header: "Classification Status", key: "classificationStatus", width: 22 },
+      { header: "Documentation Status", key: "documentationStatus", width: 22 },
+      { header: "Manual Correction", key: "manualCorrection", width: 18 },
+      { header: "Review Notes", key: "reviewNotes", width: 32 },
     ];
     th.getRow(1).font = { bold: true };
 
@@ -312,17 +335,25 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
       const excelDate = isNaN(dt.getTime()) ? t.date : dt;
       const row = th.addRow({
         date: excelDate,
+        bankAccount: accountMap.get(t.bankAccountId) ?? t.bankAccountId,
         description: t.description,
         amount: t.amount,
         finalCategory: c?.finalCategory ?? "Unclassified",
+        reportType: c?.reportType ?? "",
+        confidence: c?.confidence ?? "",
+        ruleUsed: c?.isManualCorrection ? "Manual" : (c?.ruleUsed ?? ""),
+        classificationStatus: c ? getClassificationStatus(c) : "needs_classification",
+        documentationStatus: c ? getDocumentationStatus(c) : "support_needed",
+        manualCorrection: c?.isManualCorrection ? "Yes" : "",
+        reviewNotes: c ? (REVIEW_NOTES[c.reviewStatus] ?? c.reviewStatus) : "",
       });
       row.getCell(1).numFmt = "yyyy-mm-dd";
-      row.getCell(3).numFmt = fmt;
+      row.getCell(4).numFmt = fmt;
     }
     if (th.rowCount > 1) {
       th.autoFilter = {
         from: { row: 1, column: 1 },
-        to: { row: th.rowCount, column: 4 },
+        to: { row: th.rowCount, column: 12 },
       };
     }
   }

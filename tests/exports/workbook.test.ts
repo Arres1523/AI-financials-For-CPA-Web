@@ -144,7 +144,7 @@ describe("buildWorkbookBuffer", () => {
       classifications: [sampleCl],
     });
     const th = workbook.getWorksheet("Transaction History")!;
-    const cell = th.getCell("C2");
+    const cell = th.getCell("D2");
     expect(cell.numFmt).toBe("$#,##0.00;($#,##0.00);-");
   });
 

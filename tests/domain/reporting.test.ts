@@ -219,6 +219,52 @@ describe("buildAccountingEquation", () => {
   });
 });
 
+describe("buildFinancialReport", () => {
+  it("reports matched transfer count and amount", () => {
+    const accounts = [
+      { id: "a1", openingBalance: 1000, closingBalance: 1500, accountName: "Checking", companyId: "c1" },
+      { id: "a2", openingBalance: 500, closingBalance: 1000, accountName: "Savings", companyId: "c1" },
+    ];
+    const transactions = [
+      { id: "t1", amount: -500, bankAccountId: "a1", companyId: "c1", description: "ONLINE TRANSFER", date: "2025-01-01", workspaceId: "ws-1", statementId: "st-1", originalRowIndex: 0, balance: null, createdAt: "2025-01-01T00:00:00.000Z" },
+      { id: "t2", amount: 500, bankAccountId: "a2", companyId: "c1", description: "ONLINE TRANSFER", date: "2025-01-02", workspaceId: "ws-1", statementId: "st-1", originalRowIndex: 1, balance: null, createdAt: "2025-01-01T00:00:00.000Z" },
+      { id: "t3", amount: 1000, bankAccountId: "a1", companyId: "c1", description: "Rent income", date: "2025-01-03", workspaceId: "ws-1", statementId: "st-1", originalRowIndex: 2, balance: null, createdAt: "2025-01-01T00:00:00.000Z" },
+    ];
+    const classifications = [
+      { transactionId: "t1", finalCategory: "Transfer Clearing", reportType: "Balance Sheet" as const, reviewStatus: "approved" as const, confidence: "high" as const, ruleUsed: "test", id: "c1", isManualCorrection: false, createdAt: "", updatedAt: "" },
+      { transactionId: "t2", finalCategory: "Transfer Clearing", reportType: "Balance Sheet" as const, reviewStatus: "approved" as const, confidence: "high" as const, ruleUsed: "test", id: "c2", isManualCorrection: false, createdAt: "", updatedAt: "" },
+      { transactionId: "t3", finalCategory: "Rental Income", reportType: "P&L" as const, reviewStatus: "approved" as const, confidence: "high" as const, ruleUsed: "test", id: "c3", isManualCorrection: false, createdAt: "", updatedAt: "" },
+    ];
+
+    const report = buildFinancialReport("Test LLC", 2025, accounts, transactions, classifications);
+    expect(report.matchedTransferCount).toBe(1);
+    expect(report.matchedTransferAmount).toBe(500);
+  });
+
+  it("excludes matched transfers from BS", () => {
+    const accounts = [
+      { id: "a1", openingBalance: 1000, closingBalance: 1500, accountName: "Checking", companyId: "c1" },
+      { id: "a2", openingBalance: 500, closingBalance: 1000, accountName: "Savings", companyId: "c1" },
+    ];
+    const transactions = [
+      { id: "t1", amount: -500, bankAccountId: "a1", companyId: "c1", description: "ONLINE TRANSFER", date: "2025-01-01", workspaceId: "ws-1", statementId: "st-1", originalRowIndex: 0, balance: null, createdAt: "2025-01-01T00:00:00.000Z" },
+      { id: "t2", amount: 500, bankAccountId: "a2", companyId: "c1", description: "ONLINE TRANSFER", date: "2025-01-02", workspaceId: "ws-1", statementId: "st-1", originalRowIndex: 1, balance: null, createdAt: "2025-01-01T00:00:00.000Z" },
+      { id: "t3", amount: 200, bankAccountId: "a1", companyId: "c1", description: "Contribution", date: "2025-01-03", workspaceId: "ws-1", statementId: "st-1", originalRowIndex: 2, balance: null, createdAt: "2025-01-01T00:00:00.000Z" },
+    ];
+    const classifications = [
+      { transactionId: "t1", finalCategory: "Transfer Clearing", reportType: "Balance Sheet" as const, reviewStatus: "approved" as const, confidence: "high" as const, ruleUsed: "test", id: "c1", isManualCorrection: false, createdAt: "", updatedAt: "" },
+      { transactionId: "t2", finalCategory: "Transfer Clearing", reportType: "Balance Sheet" as const, reviewStatus: "approved" as const, confidence: "high" as const, ruleUsed: "test", id: "c2", isManualCorrection: false, createdAt: "", updatedAt: "" },
+      { transactionId: "t3", finalCategory: "Capital contributions", reportType: "Balance Sheet" as const, reviewStatus: "approved" as const, confidence: "high" as const, ruleUsed: "test", id: "c3", isManualCorrection: false, createdAt: "", updatedAt: "" },
+    ];
+
+    const report = buildFinancialReport("Test LLC", 2025, accounts, transactions, classifications);
+    // Transfer Clearing should not appear in BS (both matched)
+    expect(Object.keys(report.balanceSheet.assets).filter(k => k.toLowerCase().includes("transfer"))).toHaveLength(0);
+    // Capital contributions should still show
+    expect(report.balanceSheet.equity["Capital contributions"]).toBe(200);
+  });
+});
+
 describe("determineFinancialReportMode", () => {
   it("returns complete_balance_sheet when all conditions met", () => {
     const result = determineFinancialReportMode(true, false, false, true, "passed", "complete");

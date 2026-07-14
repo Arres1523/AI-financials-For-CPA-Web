@@ -164,10 +164,24 @@ export function buildFinancialReport(
   transactions: Transaction[],
   classifications: Classification[]
 ): FinancialReport {
-  // Compute P&L and BS using the existing logic but extracting totals
-  const { pnl, balanceSheet } = buildReports(entityName, taxYear, transactions.map((t, i) => ({ ...t, classification: classifications[i], date: "", description: "", balance: null, originalRowIndex: 0, id: "", workspaceId: "", bankAccountId: "", statementId: "", createdAt: "" })) as any);
+  const companyId = accounts[0]?.companyId ?? "";
 
-  // Group transactions by account
+  // Match internal transfers FIRST so we can exclude them from BS/P&L reports
+  const matchedResult = matchInternalTransfers(transactions, accounts.map(a => a.id), companyId);
+  const matchedTxIds = new Set<string>();
+  for (const pair of matchedResult.matchedPairs) {
+    matchedTxIds.add(pair.outTransactionId);
+    matchedTxIds.add(pair.inTransactionId);
+  }
+
+  // Filter out matched transfers before building reports
+  const classByTxId = new Map(classifications.map(c => [c.transactionId, c]));
+  const filteredTransactions = transactions.filter(t => !matchedTxIds.has(t.id));
+
+  // Compute P&L and BS excluding matched transfers
+  const { pnl, balanceSheet } = buildReports(entityName, taxYear, filteredTransactions.map(t => ({ ...t, classification: classByTxId.get(t.id) ?? null, date: "", description: "", balance: null, originalRowIndex: 0, id: "", workspaceId: "", bankAccountId: "", statementId: "", createdAt: "" })) as any);
+
+  // Group all transactions by account (use all for reconciliation — cash tracking is independent)
   const txByAcct: Record<string, { amount: number }[]> = {};
   for (const t of transactions) {
     if (!txByAcct[t.bankAccountId]) txByAcct[t.bankAccountId] = [];
@@ -182,31 +196,14 @@ export function buildFinancialReport(
   const allAccountsReconciled = bankReconciliation.every(r => r.status === "reconciled");
   const openingBalancesExist = accounts.some(a => a.openingBalance !== 0);
 
-  // Match internal transfers
-  const companyId = accounts[0]?.companyId ?? "";
-  const matchedTransfers = matchInternalTransfers(
-    transactions,
-    accounts.map(a => a.id),
-    companyId
-  );
-
   const totalAssets = Object.values(balanceSheet.assets).reduce((s, v) => s + v, 0);
   const totalLiabilities = Object.values(balanceSheet.liabilities).reduce((s, v) => s + v, 0);
   const totalEquity = Object.values(balanceSheet.equity).reduce((s, v) => s + v, 0);
 
-  // Exclude matched transfers from BS totals
-  const matchedAmount = cents(matchedTransfers.matchedPairs.reduce((s, p) => s + p.amount, 0));
-  const adjustedAssets = { ...balanceSheet.assets };
-  for (const key of Object.keys(adjustedAssets)) {
-    if (key.toLowerCase().includes("transfer")) {
-      adjustedAssets[key] = cents((adjustedAssets[key] ?? 0) - matchedAmount);
-      if (Math.abs(adjustedAssets[key]) <= 0.01) delete adjustedAssets[key];
-    }
-  }
-  const totalAdjustedAssets = Object.values(adjustedAssets).reduce((s, v) => s + v, 0);
+  const matchedAmount = cents(matchedResult.matchedPairs.reduce((s, p) => s + p.amount, 0));
 
   const accountingEquation = buildAccountingEquation(
-    totalAdjustedAssets, totalLiabilities, totalEquity,
+    totalAssets, totalLiabilities, totalEquity,
     openingBalancesExist, hasSuspense, hasCardStatementsNeeded
   );
 
@@ -249,7 +246,7 @@ export function buildFinancialReport(
     actualCash,
     expectedCash,
     totalCashVariance,
-    matchedTransferCount: matchedTransfers.matchedPairs.length,
+    matchedTransferCount: matchedResult.matchedPairs.length,
     matchedTransferAmount: matchedAmount,
   };
 }

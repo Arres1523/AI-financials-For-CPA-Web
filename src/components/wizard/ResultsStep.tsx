@@ -2,8 +2,8 @@
 import React from "react";
 
 import { useState, useEffect } from "react";
-import type { Workspace, Company, BankAccount, ReconciliationResult, TransactionWithClassification } from "@/domain/types";
-import { buildReports } from "@/domain/reporting";
+import type { Workspace, Company, BankAccount, Classification, ReconciliationResult, TransactionWithClassification } from "@/domain/types";
+import { buildFinancialReport } from "@/domain/reporting";
 import { requiresReview } from "@/domain/reviewPolicy";
 
 type Props = {
@@ -34,10 +34,12 @@ export default function ResultsStep({ workspace, company, accounts, reconciliati
       .catch(() => {});
   }, [workspace.id]);
 
-  const reports = buildReports(company.legalName, workspace.taxYear, transactions);
-  const hasWarnings = Math.abs(reports.balanceSheet.balanceCheck) > 0.01 ||
-    transactions.some((t) => requiresReview(t.classification)) ||
-    reconciliation.some((r) => r.status === "unreconciled");
+  const classifications: Classification[] = transactions.map(t => t.classification).filter((c): c is Classification => c !== null);
+  const reports = buildFinancialReport(company.legalName, workspace.taxYear, accounts, transactions, classifications);
+  const hasWarnings =
+    reports.accountingEquation.status !== "passed" ||
+    reports.classificationCompleteness.status !== "complete" ||
+    reports.bankReconciliation.some(r => r.status === "unreconciled");
 
   const totalImported = transactions.length;
   const pendingReview = transactions.filter((t) => requiresReview(t.classification)).length;
@@ -90,9 +92,25 @@ export default function ResultsStep({ workspace, company, accounts, reconciliati
           <p className={`text-2xl font-semibold ${pendingReview > 0 ? "text-brass" : "text-sage"}`}>{pendingReview}</p>
         </div>
         <div className="rounded border border-line p-3">
-          <p className="text-xs text-slate-500">Balance Check</p>
-          <p className={`text-2xl font-semibold ${Math.abs(reports.balanceSheet.balanceCheck) > 0.01 ? "text-red-600" : "text-sage"}`}>
-            {money(reports.balanceSheet.balanceCheck)}
+          <p className="text-xs text-slate-500">Report Mode</p>
+          <p className="text-sm font-semibold">{reports.mode === "complete_balance_sheet" ? "✓ Complete" : reports.mode === "preliminary_balance_sheet" ? "⚠ Preliminary" : "ℹ Bank Activity"}</p>
+        </div>
+        <div className="rounded border border-line p-3">
+          <p className="text-xs text-slate-500">Bank Reconciliation</p>
+          <p className={`text-2xl font-semibold ${reports.bankReconciliation.every(r => r.status === "reconciled") ? "text-sage" : "text-red-600"}`}>
+            {reports.bankReconciliation.filter(r => r.status === "reconciled").length}/{reports.bankReconciliation.length}
+          </p>
+        </div>
+        <div className="rounded border border-line p-3">
+          <p className="text-xs text-slate-500">Classification</p>
+          <p className={`text-2xl font-semibold ${reports.classificationCompleteness.status === "complete" ? "text-sage" : "text-brass"}`}>
+            {reports.classificationCompleteness.approved}/{reports.classificationCompleteness.totalTransactions}
+          </p>
+        </div>
+        <div className="rounded border border-line p-3">
+          <p className="text-xs text-slate-500">Equation Check</p>
+          <p className={`text-2xl font-semibold ${reports.accountingEquation.status === "passed" ? "text-sage" : "text-red-600"}`}>
+            {reports.accountingEquation.status === "passed" ? "✓" : reports.accountingEquation.status === "incomplete_data" ? "…" : "✕"}
           </p>
         </div>
       </div>

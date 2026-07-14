@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import type { Classification, PnlReport, BalanceSheetReport, Transaction } from "../domain/types";
+import type { Classification, FinancialReport, Transaction } from "../domain/types";
 import { reconcileAccountPeriod } from "../domain/reconciliation";
 
 const fmt = "$#,##0.00;($#,##0.00);-";
@@ -18,7 +18,7 @@ export type WorkbookExportInput = {
   taxYear: number;
   transactions: Transaction[];
   classifications: Classification[];
-  reports: { pnl: PnlReport; balanceSheet: BalanceSheetReport };
+  reports: FinancialReport;
   flaggedTransactions: Transaction[];
   accountReconData: { id: string; account_name: string; opening_balance: number; closing_balance: number; movement_total: number }[];
   includeTransactions: boolean;
@@ -29,6 +29,36 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
   workbook.creator = "AI Financials for CPA Web";
   workbook.created = new Date();
   const genDate = new Date().toISOString().slice(0, 10);
+
+  // ─── Report Status Sheet ───────────────────────────────────
+  const statusSheet = workbook.addWorksheet("Report Status");
+  statusSheet.getColumn(1).width = 30;
+  statusSheet.getColumn(2).width = 16;
+  statusSheet.getColumn(3).width = 16;
+  statusSheet.getColumn(4).width = 20;
+  statusSheet.getColumn(5).width = 30;
+
+  headerRow(statusSheet.getCell("A1"), "Report Status");
+  statusSheet.mergeCells("A1:E1");
+
+  statusSheet.addRow(["Mode", input.reports.mode]);
+  statusSheet.addRow([]);
+
+  statusSheet.addRow(["Check", "Actual", "Expected", "Difference", "Status"]);
+  const rHdr = statusSheet.rowCount;
+  for (let c = 1; c <= 5; c++) bold(statusSheet.getCell(rHdr, c));
+
+  const reconciledCount = input.reports.bankReconciliation.filter(r => r.status === "reconciled").length;
+  const totalAccounts = input.reports.bankReconciliation.length;
+  statusSheet.addRow(["Bank Reconciliation", `${reconciledCount}/${totalAccounts}`, "All reconciled", "", reconciledCount === totalAccounts ? "✓" : "✕"]);
+
+  statusSheet.addRow(["Classification", `${input.reports.classificationCompleteness.approved}/${input.reports.classificationCompleteness.totalTransactions} approved`, "All classified", `${input.reports.classificationCompleteness.unresolved} unresolved`, input.reports.classificationCompleteness.status === "complete" ? "✓" : "✕"]);
+
+  statusSheet.addRow(["Accounting Equation", input.reports.accountingEquation.difference, "0", input.reports.accountingEquation.difference, input.reports.accountingEquation.status === "passed" ? "✓" : "✕"]);
+
+  statusSheet.addRow(["Opening Balances", input.reports.accountingEquation.missingInputs.includes("Opening Balance Sheet not provided") ? "Missing" : "Provided", "Required for Balance Sheet", "", input.reports.accountingEquation.missingInputs.includes("Opening Balance Sheet not provided") ? "✕" : "✓"]);
+
+  statusSheet.addRow(["Credit Card Statements", input.reports.accountingEquation.missingInputs.includes("Credit card statements not imported") ? "Missing" : "Provided", "Required for P&L detail", "", input.reports.accountingEquation.missingInputs.includes("Credit card statements not imported") ? "✕" : "✓"]);
 
   // ─── P&L Sheet ──────────────────────────────────────────────
   const pnl = workbook.addWorksheet(`P&L ${input.taxYear}`, { views: [{ showGridLines: false }] });
@@ -93,6 +123,36 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
   pnl.getCell(`B${niRow}`).numFmt = fmt;
   pnl.getCell(`B${niRow}`).font = { bold: true, italic: true };
 
+  // ─── Classified Bank Activity (when not complete) ──────────
+  if (input.reports.mode === "classified_bank_activity" || input.reports.mode === "preliminary_balance_sheet") {
+    const cba = workbook.addWorksheet("Classified Bank Activity", { views: [{ showGridLines: false }] });
+    cba.getColumn(1).width = 40;
+    cba.getColumn(2).width = 22;
+
+    headerRow(cba.getCell("A1"), input.companyName);
+    cba.mergeCells("A1:B1");
+    cba.getCell("A2").value = "Statement of Classified Bank Activity — For the year ended December 31, " + input.taxYear;
+    cba.mergeCells("A2:B2");
+    cba.getCell("A3").value = "Cash inflows and outflows classified by category";
+    cba.mergeCells("A3:B3");
+
+    cba.addRow([]);
+    cba.addRow(["Cash Summary", ""]);
+    bold(cba.getCell("A5"));
+    cba.addRow(["Opening Cash", input.reports.expectedCash - input.reports.pnl.netIncome]);
+    cba.addRow(["Plus: Inflows", Object.values(input.reports.pnl.income).reduce((s: number, v: number) => s + v, 0)]);
+    cba.addRow(["Less: Outflows", Object.values(input.reports.pnl.expenses).reduce((s: number, v: number) => s + v, 0)]);
+    const calcRow = cba.rowCount + 1;
+    cba.addRow(["Calculated Ending Cash", { formula: `B6+B7-B8` }]);
+    bold(cba.getCell(`A${calcRow}`));
+    cba.getCell(`B${calcRow}`).numFmt = fmt;
+    cba.addRow(["Actual Cash", input.reports.actualCash]);
+    cba.addRow(["Variance", input.reports.totalCashVariance]);
+    for (let r = 6; r <= 11; r++) {
+      if (cba.getCell(`B${r}`).numFmt !== fmt) cba.getCell(`B${r}`).numFmt = fmt;
+    }
+  }
+
   // ─── Preliminary Balance Sheet from Bank Activity ──────────
   const bs = workbook.addWorksheet("Balance Sheet", { views: [{ state: "frozen", xSplit: 0, ySplit: 1, showGridLines: false }] });
   bs.getColumn(1).width = 45;
@@ -105,7 +165,10 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
 
   headerRow(bs.getCell("A1"), input.companyName);
   bs.mergeCells("A1:B1");
-  bs.getCell("A2").value = `Preliminary Balance Sheet from Bank Activity — As of December 31, ${input.taxYear}`;
+  const bsTitle = input.reports.mode === "complete_balance_sheet"
+    ? `Balance Sheet — As of December 31, ${input.taxYear}`
+    : `Preliminary Balance Sheet from Bank Activity — As of December 31, ${input.taxYear}`;
+  bs.getCell("A2").value = bsTitle;
   bs.mergeCells("A2:B2");
   bs.getCell("A3").value = `Generated: ${genDate}`;
   bs.mergeCells("A3:B3");
@@ -193,6 +256,25 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
   for (let r = bs.rowCount - 4; r <= bs.rowCount; r++) {
     bs.getCell(`A${r}`).font = { italic: true, color: { argb: "666666" } };
     bs.getCell(`A${r}`).alignment = { wrapText: true };
+  }
+
+  // ─── Suspense Detail ────────────────────────────────────────
+  if (input.reports.suspense.length > 0) {
+    const sd = workbook.addWorksheet("Suspense Detail", { views: [{ state: "frozen", xSplit: 0, ySplit: 1 }] });
+    sd.columns = [
+      { header: "Transaction ID", key: "transactionId", width: 36 },
+      { header: "Date", key: "date", width: 16 },
+      { header: "Description", key: "description", width: 40 },
+      { header: "Amount", key: "amount", width: 18 },
+      { header: "Current Category", key: "currentCategory", width: 30 },
+      { header: "Review Status", key: "reviewStatus", width: 22 },
+      { header: "Reason", key: "reason", width: 40 },
+    ];
+    sd.getRow(1).font = { bold: true };
+    for (const item of input.reports.suspense) {
+      sd.addRow(item);
+      sd.getCell(sd.rowCount, 4).numFmt = fmt;
+    }
   }
 
   // ─── Transaction History (optional) ─────────────────────────

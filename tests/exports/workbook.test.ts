@@ -1,17 +1,31 @@
 import ExcelJS from "exceljs";
 import type { WorkbookExportInput } from "../../src/exports/workbook";
+import type { FinancialReport } from "../../src/domain/types";
 import { describe, expect, it } from "vitest";
 import { buildWorkbookBuffer } from "../../src/exports/workbook";
+
+const minimalReport: FinancialReport = {
+  mode: "classified_bank_activity",
+  modeReasons: [],
+  entityName: "Demo LLC",
+  taxYear: 2025,
+  pnl: { income: {}, expenses: {}, netIncome: 0 },
+  balanceSheet: { assets: {}, liabilities: {}, equity: {}, balanceCheck: 0 },
+  bankReconciliation: [],
+  classificationCompleteness: { totalTransactions: 0, approved: 0, excluded: 0, unresolved: 0, unresolvedAmount: 0, suspenseAmount: 0, status: "complete" },
+  accountingEquation: { totalAssets: 0, totalLiabilities: 0, totalEquity: 0, difference: 0, status: "passed", missingInputs: [] },
+  suspense: [],
+  actualCash: 0,
+  expectedCash: 0,
+  totalCashVariance: 0,
+};
 
 const minimalInput: WorkbookExportInput = {
   companyName: "Demo LLC",
   taxYear: 2025,
   transactions: [],
   classifications: [],
-  reports: {
-    pnl: { income: {}, expenses: {}, netIncome: 0 },
-    balanceSheet: { assets: {}, liabilities: {}, equity: {}, balanceCheck: 0 },
-  },
+  reports: minimalReport,
   flaggedTransactions: [],
   accountReconData: [],
   includeTransactions: false,
@@ -139,8 +153,8 @@ describe("buildWorkbookBuffer", () => {
     const workbook = await buildAndLoad({
       ...minimalInput,
       reports: {
+        ...minimalReport,
         pnl: { income: { "Revenue": 1000 }, expenses: { "Rent": 500 }, netIncome: 500 },
-        balanceSheet: { assets: {}, liabilities: {}, equity: {}, balanceCheck: 0 },
       },
     });
     const pnl = workbook.getWorksheet(`P&L 2025`)!;

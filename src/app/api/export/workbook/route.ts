@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { query, queryOne, execute } from "@/lib/db";
-import { buildReportsFromClassifications } from "@/domain/reporting";
+import { buildFinancialReport } from "@/domain/reporting";
 import { buildWorkbookBuffer } from "@/exports/workbook";
 import { v4 as uuid } from "uuid";
 
@@ -65,12 +65,20 @@ export async function POST(request: Request) {
     updatedAt: r.created_at,
   }));
 
-  const joined = transactions.map((t: any, i: number) => ({
-    transaction: t,
-    classification: classifications[i],
+  const accounts = await query("SELECT * FROM bank_accounts WHERE company_id = (SELECT company_id FROM workspaces WHERE id = $1)", [body.workspaceId]);
+  const typedAccounts = accounts.map((a: any) => ({
+    id: a.id,
+    accountName: a.account_name,
+    bankName: a.bank_name,
+    lastFour: a.last_four,
+    accountType: a.account_type,
+    openingBalance: a.opening_balance,
+    closingBalance: a.closing_balance,
+    companyId: a.company_id,
+    createdAt: a.created_at,
   }));
 
-  const reports = buildReportsFromClassifications(companyName, taxYear, joined);
+  const reports = buildFinancialReport(companyName, taxYear, typedAccounts, transactions, classifications);
 
   const flaggedTransactions = transactions.filter((_: any, i: number) => {
     const s = classifications[i]?.reviewStatus;

@@ -128,7 +128,7 @@ describe("buildReports", () => {
 describe("buildBankReconciliation", () => {
   it("returns reconciled when variance <= 0.01", () => {
     const result = buildBankReconciliation([
-      { id: "a1", openingBalance: 1000, closingBalance: 1500 },
+      { id: "a1", openingBalance: 1000, closingBalance: 1500, accountName: "Checking" },
     ], { a1: [{ amount: 500 } as any] });
     expect(result[0].status).toBe("reconciled");
     expect(result[0].variance).toBe(0);
@@ -136,7 +136,7 @@ describe("buildBankReconciliation", () => {
 
   it("returns unreconciled when variance > 0.01", () => {
     const result = buildBankReconciliation([
-      { id: "a1", openingBalance: 1000, closingBalance: 1600 },
+      { id: "a1", openingBalance: 1000, closingBalance: 1600, accountName: "Checking" },
     ], { a1: [{ amount: 500 } as any] });
     expect(result[0].status).toBe("unreconciled");
     expect(Math.abs(result[0].variance)).toBeGreaterThan(0.01);

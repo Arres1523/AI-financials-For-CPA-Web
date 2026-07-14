@@ -36,11 +36,6 @@ export default function ResultsStep({ workspace, company, accounts, reconciliati
 
   const classifications: Classification[] = transactions.map(t => t.classification).filter((c): c is Classification => c !== null);
   const reports = buildFinancialReport(company.legalName, workspace.taxYear, accounts, transactions, classifications);
-  const hasWarnings =
-    reports.accountingEquation.status !== "passed" ||
-    reports.classificationCompleteness.status !== "complete" ||
-    reports.bankReconciliation.some(r => r.status === "unreconciled");
-
   const totalImported = transactions.length;
   const pendingReview = transactions.filter((t) => requiresReview(t.classification)).length;
 
@@ -125,16 +120,28 @@ export default function ResultsStep({ workspace, company, accounts, reconciliati
       )}
 
       {/* Alerts */}
-      {hasWarnings && (
-        <div className="rounded border border-brass/30 bg-brass/5 p-4 text-sm text-brass space-y-1">
-          <p className="font-medium">⚠ Preliminary reports alert</p>
-          <ul className="list-disc list-inside">
-            <li>These financial statements are <strong>preliminary</strong>.</li>
-            <li>Generated solely from the uploaded bank statement data.</li>
-            <li>The Balance Sheet may be incomplete.</li>
-            <li>We never invent or adjust figures to make it balance.</li>
-            <li>This does not substitute a professional CPA review.</li>
-          </ul>
+      {reports.bankReconciliation.some(r => r.status === "unreconciled") && (
+        <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <p className="font-medium">✕ Bank Reconciliation</p>
+          <p>One or more bank accounts have unreconciled transactions. The balance sheet may be inaccurate.</p>
+        </div>
+      )}
+      {reports.classificationCompleteness.status === "incomplete" && (
+        <div className="rounded border border-brass/30 bg-brass/5 p-4 text-sm text-brass">
+          <p className="font-medium">⚠ Classification Incomplete</p>
+          <p>{reports.classificationCompleteness.approved} of {reports.classificationCompleteness.totalTransactions} transactions have been classified. Unclassified transactions may affect the financial statements.</p>
+        </div>
+      )}
+      {reports.accountingEquation.status !== "passed" && (
+        <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          <p className="font-medium">✕ Accounting Equation</p>
+          <p>Assets do not equal liabilities plus equity. The balance sheet is out of balance by {money(Math.abs(reports.balanceSheet.balanceCheck))}.</p>
+        </div>
+      )}
+      {reports.suspense.length > 0 && (
+        <div className="rounded border border-brass/30 bg-brass/5 p-4 text-sm text-brass">
+          <p className="font-medium">⚠ Suspense Items</p>
+          <p>{reports.suspense.length} transaction(s) could not be fully classified and have been placed in suspense accounts.</p>
         </div>
       )}
 

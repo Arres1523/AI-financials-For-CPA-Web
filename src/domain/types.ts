@@ -154,6 +154,92 @@ export type ReportPackage = {
   balanceSheet: BalanceSheetReport;
 };
 
+// ─── New reporting controls ────────────────────────────────────
+export type CheckStatus = "passed" | "failed" | "incomplete_data";
+
+export type BankReconciliationCheck = {
+  accountId: string;
+  accountName: string;
+  openingBalance: number;
+  movementTotal: number;
+  expectedClosingBalance: number;
+  actualClosingBalance: number;
+  variance: number;
+  status: "reconciled" | "unreconciled";
+};
+
+export type ClassificationCompletenessCheck = {
+  totalTransactions: number;
+  approved: number;
+  excluded: number;
+  unresolved: number;
+  unresolvedAmount: number;
+  suspenseAmount: number;
+  status: "complete" | "incomplete";
+};
+
+export type AccountingEquationCheck = {
+  totalAssets: number;
+  totalLiabilities: number;
+  totalEquity: number;
+  difference: number;
+  status: CheckStatus;
+  missingInputs: string[];
+};
+
+export type FinancialReportMode = "classified_bank_activity" | "preliminary_balance_sheet" | "complete_balance_sheet";
+
+export type SuspenseItem = {
+  transactionId: string;
+  date: string;
+  description: string;
+  amount: number;
+  currentCategory: string;
+  reviewStatus: ReviewStatus;
+  reason: string;
+};
+
+export type MatchedTransferPair = {
+  outTransactionId: string;
+  inTransactionId: string;
+  outAccountId: string;
+  inAccountId: string;
+  amount: number;
+  dateDifferenceDays: number;
+};
+
+export type OpeningBalanceEntry = {
+  id: string;
+  workspaceId: string;
+  accountName: string;
+  accountType: "asset" | "liability" | "equity";
+  amount: number;
+  source: string;
+  supportStatus: "provided" | "missing" | "reviewed";
+};
+
+export type OpeningBalanceSheetInput = {
+  entries: OpeningBalanceEntry[];
+  isValid: boolean;
+  difference: number;
+};
+
+export type FinancialReport = {
+  mode: FinancialReportMode;
+  modeReasons: string[];
+  entityName: string;
+  taxYear: number;
+  pnl: PnlReport;
+  balanceSheet: BalanceSheetReport;
+  bankReconciliation: BankReconciliationCheck[];
+  classificationCompleteness: ClassificationCompletenessCheck;
+  accountingEquation: AccountingEquationCheck;
+  suspense: SuspenseItem[];
+  actualCash: number;
+  expectedCash: number;
+  totalCashVariance: number;
+};
+
 export type ColumnMapping = {
   date: string;
   description: string;

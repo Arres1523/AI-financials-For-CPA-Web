@@ -47,15 +47,27 @@ export function classifyTransaction(transaction: Transaction): Classification {
   const amount = transaction.amount;
 
   // Balance Sheet — Transfer clearing (inter-account transfers)
-  if (has(text, [/TRANSFER.*BETWEEN/, /TRF.*TO/, /TRF.*FROM/, /ACCT TRANSFER/, /INTERNAL TRANSFER/])) {
+  // Covers "Online Transfer from/to CHK" and standard transfer patterns
+  if (has(text, [/TRANSFER.*BETWEEN/, /TRF.*TO/, /TRF.*FROM/, /ACCT TRANSFER/, /INTERNAL TRANSFER/, /ONLINE TRANSFER/])) {
     return HIGH(transaction.id, "Transfer Clearing", "Balance Sheet", "Inter-account transfer pattern");
   }
 
+  // Balance Sheet — Wire Transfers (needs CPA review — may be capitalized or vendor cost)
+  if (has(text, [/WIRE TRANSFER/, /DOMESTIC WIRE/])) {
+    return MEDIUM(transaction.id, "Wire Transfers", "Balance Sheet", "Wire transfer — needs CPA review");
+  }
+
   // Balance Sheet — Credit Card Liability
-  if (has(text, [/AMEX/, /CREDIT CARD/, /CARDMEMBER/, /CC PAYMENT/, /AUTOPAY.*CARD/, /PAYMENT.*CARD/, /CHASE CARD/])) {
+  // Covers explicit card keywords and AUTOPAY patterns without CARD keyword
+  if (has(text, [/AMEX/, /CREDIT CARD/, /CARDMEMBER/, /CC PAYMENT/, /AUTOPAY.*CARD/, /PAYMENT.*CARD/, /CHASE CARD/, /AUTOPAY.*AUTO.?PMT/, /AUTOPAY.*PAYMENT/, /CITI.*AUTOPAY/])) {
     return amount < 0
       ? HIGH(transaction.id, "Credit Card Liability", "Balance Sheet", "Credit card payment pattern")
       : MEDIUM(transaction.id, "Credit Card Liability", "Balance Sheet", "Credit card credit pattern");
+  }
+
+  // P&L — ACH Income (ACH signature/test deposits, before VALORIS to avoid company-name false positive)
+  if (has(text, [/SIGONFILE/]) && amount > 0) {
+    return HIGH(transaction.id, "Other Income", "P&L", "ACH signature deposit pattern");
   }
 
   // Balance Sheet — Owner Contributions
@@ -131,8 +143,13 @@ export function classifyTransaction(transaction: Transaction): Classification {
     return HIGH(transaction.id, "Management Fees", "P&L", "Management fee pattern");
   }
 
-  // P&L — Bank Fees
-  if (has(text, [/BANK FEE/, /SERVICE FEE/, /WIRE FEE/, /MONTHLY FEE/, /TRANSACTION FEE/, /NSF/, /OVERDRAFT/])) {
+  // P&L — Merchant Processing Fees (before Bank Fees for proper categorization)
+  if (has(text, [/TRAN FEE/, /MERCHANT FEE/, /PROCESSING FEE/]) && amount < 0) {
+    return HIGH(transaction.id, "Merchant Processing Fees", "P&L", "Merchant processing fee pattern");
+  }
+
+  // P&L — Bank Fees (fixed /NSF/ → /\\bNSF\\b/ to prevent match inside "TRANSFER")
+  if (has(text, [/BANK FEE/, /SERVICE FEE/, /WIRE FEE/, /MONTHLY FEE/, /TRANSACTION FEE/, /\bNSF\b/, /OVERDRAFT/, /SERVICE CHARGE/, /FOR THE MONTH OF/])) {
     return HIGH(transaction.id, "Bank Fees", "P&L", "Bank fee pattern");
   }
 

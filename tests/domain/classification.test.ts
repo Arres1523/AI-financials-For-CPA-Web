@@ -64,4 +64,87 @@ describe("classifyTransaction", () => {
     expect(c.finalCategory).toBe("Capital Improvements");
     expect(c.reviewStatus).toBe("pending");
   });
+
+  // --- P0 Bug Fix: /NSF/ word boundary ---
+  it("does not match NSF inside TRANSFER", () => {
+    const c = classifyTransaction(tx("Online Transfer from CHK ...1234", 10000));
+    expect(c.finalCategory).toBe("Transfer Clearing");
+    expect(c.reportType).toBe("Balance Sheet");
+  });
+
+  it("matches standalone NSF as bank fee", () => {
+    const c = classifyTransaction(tx("NSF FEE CHARGED", -35));
+    expect(c.finalCategory).toBe("Bank Fees");
+    expect(c.reportType).toBe("P&L");
+  });
+
+  // --- P0: Online Transfer pattern ---
+  it("classifies Online Transfer from CHK as Transfer Clearing", () => {
+    const c = classifyTransaction(tx("Online Transfer from CHK ...2516 transaction#: 12345", 10000));
+    expect(c.finalCategory).toBe("Transfer Clearing");
+    expect(c.reportType).toBe("Balance Sheet");
+  });
+
+  it("classifies Online Transfer to CHK as Transfer Clearing", () => {
+    const c = classifyTransaction(tx("Online Transfer to CHK ...9291 transaction#: 67890", -50000));
+    expect(c.finalCategory).toBe("Transfer Clearing");
+    expect(c.reportType).toBe("Balance Sheet");
+  });
+
+  // --- P0: AUTOPAY without CARD keyword ---
+  it("classifies AUTOPAY AUTO-PMT as Credit Card Liability", () => {
+    const c = classifyTransaction(tx("AUTOPAY 2954520RAUTOPAY AUTO-PMT", -1847.83));
+    expect(c.finalCategory).toBe("Credit Card Liability");
+    expect(c.reportType).toBe("Balance Sheet");
+    expect(c.confidence).toBe("high");
+  });
+
+  it("classifies CITI AUTOPAY as Credit Card Liability", () => {
+    const c = classifyTransaction(tx("ORIG CO NAME:CITI AUTOPAY ORIG ID:CITICARDAP DESC DATE:250131 CO ENTRY DESCR:PAYMENT SEC:WEB", -859.56));
+    expect(c.finalCategory).toBe("Credit Card Liability");
+    expect(c.reportType).toBe("Balance Sheet");
+  });
+
+  // --- P1: Wire Transfer rule ---
+  it("classifies domestic wire transfer as Balance Sheet pending review", () => {
+    const c = classifyTransaction(tx("ONLINE DOMESTIC WIRE TRANSFER VIA: THREAD BANK/064209588 A/C: AS TRAINING LLC", -5000));
+    expect(c.finalCategory).toBe("Wire Transfers");
+    expect(c.reportType).toBe("Balance Sheet");
+    expect(c.reviewStatus).toBe("pending");
+  });
+
+  // --- P1: Service Charges pattern ---
+  it("classifies SERVICE CHARGES FOR THE MONTH OF as Bank Fees", () => {
+    const c = classifyTransaction(tx("SERVICE CHARGES FOR THE MONTH OF APRIL", -100));
+    expect(c.finalCategory).toBe("Bank Fees");
+    expect(c.reportType).toBe("P&L");
+  });
+
+  // --- P1: ACH signature deposit pattern ---
+  it("classifies SIGONFILE deposit as Other Income", () => {
+    const c = classifyTransaction(tx("ORIG CO NAME:Alexander Forres ORIG ID:9000271750 DESC DATE:011325 CO ENTRY DESCR:SIGONFILE SEC:PPD", 0.01));
+    expect(c.finalCategory).toBe("Other Income");
+    expect(c.reportType).toBe("P&L");
+    expect(c.confidence).toBe("high");
+  });
+
+  // --- P1: SIGONFILE before VALORIS false positive ---
+  it("classifies SIGONFILE with VALORIS in description as Other Income not related party", () => {
+    const c = classifyTransaction(tx("ORIG CO NAME:Alexander Forres DESC DATE:110425 CO ENTRY DESCR:SIGONFILE IND NAME:Valoris Capital Partne", 163.53));
+    expect(c.finalCategory).toBe("Other Income");
+    expect(c.reportType).toBe("P&L");
+  });
+
+  // --- P2: Merchant Processing Fees ---
+  it("classifies INTUIT TRAN FEE as Merchant Processing Fees", () => {
+    const c = classifyTransaction(tx("ORIG CO NAME: INTUIT 27262443 ORIG ID:9215986202 DESC DATE:250131 CO ENTRY DESCR:TRAN FEE SEC:CCD", -20.18));
+    expect(c.finalCategory).toBe("Merchant Processing Fees");
+    expect(c.reportType).toBe("P&L");
+  });
+
+  it("classifies generic MERCHANT FEE as Merchant Processing Fees", () => {
+    const c = classifyTransaction(tx("MONTHLY MERCHANT FEE", -15));
+    expect(c.finalCategory).toBe("Merchant Processing Fees");
+    expect(c.reportType).toBe("P&L");
+  });
 });

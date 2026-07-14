@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildReports } from "../../src/domain/reporting";
+import { buildReports, buildBankReconciliation, buildClassificationCompleteness, buildAccountingEquation, determineFinancialReportMode, buildFinancialReport } from "../../src/domain/reporting";
 import type { TransactionWithClassification } from "../../src/domain/types";
 
 describe("buildReports", () => {
@@ -84,5 +84,154 @@ describe("buildReports", () => {
     expect(reports.balanceSheet.equity["Member distributions"]).toBe(-2000);
     expect(reports.balanceSheet.liabilities["Credit card payable"]).toBe(-100);
     expect(reports.balanceSheet.liabilities["Due to related parties"]).toBe(3000);
+  });
+
+  it("verifies full P&L and BS output with hand-calculated values", () => {
+    const PnL = "P&L" as const;
+    const BS = "Balance Sheet" as const;
+    const reports = buildReports("Test LLC", 2025, [
+      make("1", "Rent", 5000, "Rental Income", PnL),
+      make("2", "Bank fee", -100, "Bank Fees", PnL),
+      make("3", "Merchant fee", -25.5, "Merchant Processing Fees", PnL),
+      make("4", "Transfer in", 2000, "Transfer Clearing", BS),
+      make("5", "CC payment", -500, "Credit card payable", BS),
+      make("6", "Cash in", 10000, "Capital contributions", BS),
+      make("7", "Draw", -3000, "Member distributions", BS),
+    ]);
+
+    // P&L
+    expect(reports.pnl.income).toEqual({ "Rental Income": 5000 });
+    expect(reports.pnl.expenses).toEqual({ "Bank Fees": 100, "Merchant Processing Fees": 25.5 });
+    expect(reports.pnl.netIncome).toBe(4874.5);
+
+    // BS — assets (no liability/equity match → falls to assets)
+    expect(reports.balanceSheet.assets).toEqual({ "Transfer Clearing": 2000 });
+
+    // BS — liabilities (matches /payable|liability|Due To|Loan/i)
+    expect(reports.balanceSheet.liabilities).toEqual({ "Credit card payable": -500 });
+
+    // BS — equity (matches /contribution|distribution|net income/i)
+    expect(reports.balanceSheet.equity).toEqual({
+      "Capital contributions": 10000,
+      "Member distributions": -3000,
+      "Current Year Net Income": 4874.5,
+    });
+
+    // Balance Check = Assets - Liabilities - Equity
+    // = 2000 - (-500) - (10000 + (-3000) + 4874.5)
+    // = 2000 + 500 - 11874.5
+    // = -9374.5
+    expect(reports.balanceSheet.balanceCheck).toBe(-9374.5);
+  });
+});
+
+describe("buildBankReconciliation", () => {
+  it("returns reconciled when variance <= 0.01", () => {
+    const result = buildBankReconciliation([
+      { id: "a1", openingBalance: 1000, closingBalance: 1500 },
+    ], { a1: [{ amount: 500 } as any] });
+    expect(result[0].status).toBe("reconciled");
+    expect(result[0].variance).toBe(0);
+  });
+
+  it("returns unreconciled when variance > 0.01", () => {
+    const result = buildBankReconciliation([
+      { id: "a1", openingBalance: 1000, closingBalance: 1600 },
+    ], { a1: [{ amount: 500 } as any] });
+    expect(result[0].status).toBe("unreconciled");
+    expect(Math.abs(result[0].variance)).toBeGreaterThan(0.01);
+  });
+
+  it("handles multiple accounts", () => {
+    const accounts = [
+      { id: "a1", openingBalance: 1000, closingBalance: 1500, accountName: "Checking" },
+      { id: "a2", openingBalance: 500, closingBalance: 400, accountName: "Savings" },
+    ];
+    const txByAcct = { a1: [{ amount: 500 } as any], a2: [{ amount: -100 } as any] };
+    const result = buildBankReconciliation(accounts as any, txByAcct);
+    expect(result).toHaveLength(2);
+    expect(result.every(r => r.status === "reconciled")).toBe(true);
+  });
+});
+
+describe("buildClassificationCompleteness", () => {
+  const mkClass = (status: string, category?: string) => ({ reviewStatus: status, finalCategory: category ?? "Rental Income" }) as any;
+
+  it("returns complete when all approved", () => {
+    const result = buildClassificationCompleteness([
+      mkClass("approved"), mkClass("approved"), mkClass("excluded"),
+    ]);
+    expect(result.status).toBe("complete");
+    expect(result.unresolved).toBe(0);
+  });
+
+  it("returns incomplete when any pending or unresolved", () => {
+    const result = buildClassificationCompleteness([
+      mkClass("approved"), mkClass("pending"),
+    ]);
+    expect(result.status).toBe("incomplete");
+    expect(result.unresolved).toBe(1);
+  });
+
+  it("counts suspense for Uncategorized", () => {
+    const result = buildClassificationCompleteness([
+      mkClass("pending", "Uncategorized / Needs Review"),
+    ]);
+    expect(result.suspenseAmount).toBe(0);
+    expect(result.status).toBe("incomplete");
+  });
+});
+
+describe("buildAccountingEquation", () => {
+  it("passes when difference is 0 and all inputs present", () => {
+    const result = buildAccountingEquation(1000, 300, 700, true, false, false);
+    expect(result.status).toBe("passed");
+    expect(result.difference).toBe(0);
+  });
+
+  it("fails when difference != 0 and all inputs present", () => {
+    const result = buildAccountingEquation(1000, 300, 600, true, false, false);
+    expect(result.status).toBe("failed");
+    expect(result.difference).toBe(100);
+  });
+
+  it("returns incomplete_data when opening balances missing", () => {
+    const result = buildAccountingEquation(1000, 300, 700, false, false, false);
+    expect(result.status).toBe("incomplete_data");
+    expect(result.missingInputs).toContain("Opening Balance Sheet not provided");
+  });
+
+  it("returns incomplete_data when suspense exists", () => {
+    const result = buildAccountingEquation(1000, 300, 700, true, true, false);
+    expect(result.status).toBe("incomplete_data");
+    expect(result.missingInputs).toContain("Unresolved suspense entries");
+  });
+
+  it("returns incomplete_data when card statements needed", () => {
+    const result = buildAccountingEquation(1000, 300, 700, true, false, true);
+    expect(result.status).toBe("incomplete_data");
+    expect(result.missingInputs).toContain("Credit card statements not imported");
+  });
+
+  it("difference zero with incomplete data still returns incomplete_data", () => {
+    const result = buildAccountingEquation(1000, 300, 700, false, false, false);
+    expect(result.status).toBe("incomplete_data");
+  });
+});
+
+describe("determineFinancialReportMode", () => {
+  it("returns complete_balance_sheet when all conditions met", () => {
+    const result = determineFinancialReportMode(true, false, false, true, "passed", "complete");
+    expect(result.mode).toBe("complete_balance_sheet");
+  });
+
+  it("returns preliminary_balance_sheet when opening balances exist but suspense", () => {
+    const result = determineFinancialReportMode(true, true, false, true, "incomplete_data", "incomplete");
+    expect(result.mode).toBe("preliminary_balance_sheet");
+  });
+
+  it("returns classified_bank_activity when no opening balances", () => {
+    const result = determineFinancialReportMode(false, false, false, false, "incomplete_data", "incomplete");
+    expect(result.mode).toBe("classified_bank_activity");
   });
 });

@@ -1,4 +1,7 @@
-import type { Classification, PnlReport, BalanceSheetReport, ReportPackage, TransactionWithClassification } from "./types";
+import type { Classification, PnlReport, BalanceSheetReport, ReportPackage, TransactionWithClassification, BankAccount, BankReconciliationCheck, ClassificationCompletenessCheck, AccountingEquationCheck, FinancialReportMode, FinancialReport, SuspenseItem } from "./types";
+import { reconcileAccountPeriod } from "./reconciliation";
+
+const cents = (v: number) => Math.round(v * 100) / 100;
 
 const add = (record: Record<string, number>, key: string, amount: number) => {
   record[key] = Math.round(((record[key] ?? 0) + amount) * 100) / 100;
@@ -59,4 +62,172 @@ export function buildReports(entityName: string, taxYear: number, classification
       .filter((t) => t.classification)
       .map((t) => ({ transaction: t, classification: t.classification! }))
   );
+}
+
+export function buildBankReconciliation(
+  accounts: Pick<BankAccount, "id" | "openingBalance" | "closingBalance" | "accountName">[],
+  transactionsByAccount: Record<string, { amount: number }[]>
+): BankReconciliationCheck[] {
+  return accounts.map((a) => {
+    const result = reconcileAccountPeriod(a.openingBalance, a.closingBalance, (transactionsByAccount[a.id] ?? []).map(t => ({ ...t, bankAccountId: a.id })) as any);
+    return {
+      accountId: a.id,
+      accountName: a.accountName ?? "Unknown",
+      openingBalance: result.openingBalance,
+      movementTotal: result.movementTotal,
+      expectedClosingBalance: result.expectedClosingBalance,
+      actualClosingBalance: result.closingBalance,
+      variance: result.variance,
+      status: result.status,
+    };
+  });
+}
+
+export function buildClassificationCompleteness(classifications: Classification[]): ClassificationCompletenessCheck {
+  const total = classifications.length;
+  const approved = classifications.filter(c => c.reviewStatus === "approved").length;
+  const excluded = classifications.filter(c => c.reviewStatus === "excluded").length;
+  const unresolvedStatuses = ["pending", "support_needed", "cpa_review", "card_statements_needed"];
+  const unresolved = classifications.filter(c => unresolvedStatuses.includes(c.reviewStatus));
+  const suspense = classifications.filter(c => c.finalCategory?.includes("Uncategorized") || c.reviewStatus === "pending");
+  return {
+    totalTransactions: total,
+    approved,
+    excluded,
+    unresolved: unresolved.length,
+    unresolvedAmount: cents(unresolved.reduce((s, c) => s + Math.abs(0), 0)),
+    suspenseAmount: cents(suspense.reduce((s, c) => s + Math.abs(0), 0)),
+    status: unresolved.length > 0 ? "incomplete" : "complete",
+  };
+}
+
+export function buildAccountingEquation(
+  totalAssets: number,
+  totalLiabilities: number,
+  totalEquity: number,
+  openingBalancesExist: boolean,
+  hasSuspense: boolean,
+  hasCardStatementsNeeded: boolean
+): AccountingEquationCheck {
+  const difference = cents(totalAssets - totalLiabilities - totalEquity);
+  const missingInputs: string[] = [];
+  if (!openingBalancesExist) missingInputs.push("Opening Balance Sheet not provided");
+  if (hasSuspense) missingInputs.push("Unresolved suspense entries");
+  if (hasCardStatementsNeeded) missingInputs.push("Credit card statements not imported");
+
+  let status: "passed" | "failed" | "incomplete_data";
+  if (missingInputs.length > 0) {
+    status = "incomplete_data";
+  } else if (Math.abs(difference) <= 0.01) {
+    status = "passed";
+  } else {
+    status = "failed";
+  }
+
+  return { totalAssets, totalLiabilities, totalEquity, difference, status, missingInputs };
+}
+
+export function determineFinancialReportMode(
+  openingBalancesExist: boolean,
+  hasSuspense: boolean,
+  hasCardStatementsNeeded: boolean,
+  allAccountsReconciled: boolean,
+  equationStatus: string,
+  classificationStatus: string
+): { mode: FinancialReportMode; reasons: string[] } {
+  const reasons: string[] = [];
+
+  if (openingBalancesExist && !hasSuspense && !hasCardStatementsNeeded
+      && allAccountsReconciled && equationStatus === "passed" && classificationStatus === "complete") {
+    return { mode: "complete_balance_sheet", reasons };
+  }
+
+  if (!openingBalancesExist) reasons.push("Opening Balance Sheet not provided");
+  if (hasSuspense) reasons.push("Unresolved suspense entries exist");
+  if (hasCardStatementsNeeded) reasons.push("Credit card statements pending");
+  if (!allAccountsReconciled) reasons.push("One or more bank accounts not reconciled");
+  if (equationStatus !== "passed") reasons.push("Accounting equation not satisfied");
+  if (classificationStatus !== "complete") reasons.push("Classification review incomplete");
+
+  if (openingBalancesExist || hasSuspense || hasCardStatementsNeeded) {
+    return { mode: "preliminary_balance_sheet", reasons };
+  }
+
+  return { mode: "classified_bank_activity", reasons };
+}
+
+export function buildFinancialReport(
+  entityName: string,
+  taxYear: number,
+  accounts: Pick<BankAccount, "id" | "openingBalance" | "closingBalance" | "accountName">[],
+  transactions: { amount: number; bankAccountId: string }[],
+  classifications: Classification[]
+): FinancialReport {
+  // Compute P&L and BS using the existing logic but extracting totals
+  const { pnl, balanceSheet } = buildReports(entityName, taxYear, transactions.map((t, i) => ({ ...t, classification: classifications[i], date: "", description: "", balance: null, originalRowIndex: 0, id: "", workspaceId: "", bankAccountId: "", statementId: "", createdAt: "" })) as any);
+
+  // Group transactions by account
+  const txByAcct: Record<string, { amount: number }[]> = {};
+  for (const t of transactions) {
+    if (!txByAcct[t.bankAccountId]) txByAcct[t.bankAccountId] = [];
+    txByAcct[t.bankAccountId].push(t);
+  }
+
+  const bankReconciliation = buildBankReconciliation(accounts, txByAcct);
+  const classificationCompleteness = buildClassificationCompleteness(classifications);
+
+  const hasSuspense = classifications.some(c => c.finalCategory?.includes("Uncategorized") || c.reviewStatus === "pending");
+  const hasCardStatementsNeeded = classifications.some(c => c.reviewStatus === "card_statements_needed");
+  const allAccountsReconciled = bankReconciliation.every(r => r.status === "reconciled");
+  const openingBalancesExist = accounts.some(a => a.openingBalance !== 0);
+
+  const totalAssets = Object.values(balanceSheet.assets).reduce((s, v) => s + v, 0);
+  const totalLiabilities = Object.values(balanceSheet.liabilities).reduce((s, v) => s + v, 0);
+  const totalEquity = Object.values(balanceSheet.equity).reduce((s, v) => s + v, 0);
+
+  const accountingEquation = buildAccountingEquation(
+    totalAssets, totalLiabilities, totalEquity,
+    openingBalancesExist, hasSuspense, hasCardStatementsNeeded
+  );
+
+  const { mode, reasons } = determineFinancialReportMode(
+    openingBalancesExist, hasSuspense, hasCardStatementsNeeded,
+    allAccountsReconciled, accountingEquation.status, classificationCompleteness.status
+  );
+
+  // Suspense items
+  const suspense: SuspenseItem[] = classifications
+    .filter(c => c.finalCategory?.includes("Uncategorized") || c.reviewStatus === "pending")
+    .map(c => ({
+      transactionId: c.transactionId,
+      date: "",
+      description: "",
+      amount: 0,
+      currentCategory: c.finalCategory ?? "Unknown",
+      reviewStatus: c.reviewStatus,
+      reason: c.ruleUsed ?? "Unresolved classification",
+    }));
+
+  // Cash from real balances
+  const actualCash = cents(accounts.reduce((s, a) => s + (a.closingBalance ?? 0), 0));
+  const movementTotal = cents(transactions.reduce((s, t) => s + t.amount, 0));
+  const openingCash = cents(accounts.reduce((s, a) => s + (a.openingBalance ?? 0), 0));
+  const expectedCash = cents(openingCash + movementTotal);
+  const totalCashVariance = cents(actualCash - expectedCash);
+
+  return {
+    mode,
+    modeReasons: reasons,
+    entityName,
+    taxYear,
+    pnl,
+    balanceSheet,
+    bankReconciliation,
+    classificationCompleteness,
+    accountingEquation,
+    suspense,
+    actualCash,
+    expectedCash,
+    totalCashVariance,
+  };
 }

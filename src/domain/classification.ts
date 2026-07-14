@@ -1,4 +1,4 @@
-import type { Classification, Transaction, CounterpartyRule } from "./types";
+import type { Classification, Transaction } from "./types";
 import { v4 as uuid } from "uuid";
 
 const has = (value: string, patterns: RegExp[]) => patterns.some((p) => p.test(value));
@@ -68,48 +68,6 @@ const CPA_REVIEW = (txId: string, cat: string, report: "P&L" | "Balance Sheet", 
   updatedAt: new Date().toISOString(),
 });
 
-const COUNTERPARTY_RULES: CounterpartyRule[] = [
-  {
-    id: "cp-valoris-wyndham",
-    companyId: "valoris-capital-partners",
-    pattern: "Wyndham Investment Group LLC",
-    direction: "in",
-    finalCategory: "Operating / merchant income",
-    reportType: "P&L",
-    confidence: "high",
-    reviewStatus: "approved",
-    ruleUsed: "Counterparty rule — Wyndham Investment Group",
-  },
-];
-
-function getCounterpartyRules(companyId: string): CounterpartyRule[] {
-  return COUNTERPARTY_RULES.filter((r) => r.companyId === companyId);
-}
-
-function classifyByCounterparty(description: string, amount: number, companyId: string | undefined): Classification | null {
-  if (!companyId) return null;
-  const normalized = description.toUpperCase();
-  const rules = getCounterpartyRules(companyId);
-  for (const rule of rules) {
-    if (!normalized.includes(rule.pattern.toUpperCase())) continue;
-    if (rule.direction === "in" && amount <= 0) continue;
-    if (rule.direction === "out" && amount >= 0) continue;
-    return {
-      id: uuid(),
-      transactionId: "",
-      finalCategory: rule.finalCategory,
-      reportType: rule.reportType,
-      confidence: rule.confidence,
-      ruleUsed: rule.ruleUsed,
-      reviewStatus: rule.reviewStatus,
-      isManualCorrection: false,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-  }
-  return null;
-}
-
 export function classifyTransaction(transaction: Transaction): Classification {
   const text = transaction.description.toUpperCase();
   const amount = transaction.amount;
@@ -146,6 +104,11 @@ export function classifyTransaction(transaction: Transaction): Classification {
   // Balance Sheet — Member distributions
   if (has(text, [/DISTRIBUTION/, /DRAW/, /OWNER PAY/, /MEMBER DISTRIBUTION/, /OWNER WITHDRAW/]) && amount < 0) {
     return HIGH(transaction.id, "Member distributions", "Balance Sheet", "Owner distribution pattern");
+  }
+
+  // P&L — Merchant / operating income (known counterparties)
+  if (has(text, [/WYNDHAM INVESTMENT/i]) && amount > 0) {
+    return HIGH(transaction.id, "Operating / merchant income", "P&L", "Known counterparty — Wyndham Investment Group");
   }
 
   // Balance Sheet — Due From/To Related Parties (Support Needed)
@@ -235,10 +198,6 @@ export function classifyTransaction(transaction: Transaction): Classification {
   if (has(text, [/\bK-?1\b/, /TAX BASIS/, /AT-?RISK/, /TAX CAPITAL/, /SCHEDULE K/])) {
     return CPA_REVIEW(transaction.id, "Transfer Clearing", "Balance Sheet", "K-1 / tax item — needs CPA review");
   }
-
-  // Counterparty rules (entity-specific, before generic fallback)
-  const cp = classifyByCounterparty(transaction.description, transaction.amount, transaction.companyId);
-  if (cp) return cp;
 
   // Fallback — not included in reports until reviewed
   return LOW(transaction.id, "Uncategorized / Needs Review", "Balance Sheet", "Unrecognized pattern — needs review");

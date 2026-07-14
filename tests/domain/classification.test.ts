@@ -156,8 +156,8 @@ describe("classifyTransaction", () => {
     companyId,
   });
 
-  it("matches Wyndham positive deposit via counterparty rule (Valoris)", () => {
-    const c = classifyTransaction(txWithCompany("Wyndham Investment Group LLC", 675, "valoris-capital-partners"));
+  it("matches Wyndham positive deposit via pattern rule", () => {
+    const c = classifyTransaction(tx("Wyndham Investment Group LLC", 675));
     expect(c.finalCategory).toBe("Operating / merchant income");
     expect(c.reportType).toBe("P&L");
     expect(c.confidence).toBe("high");
@@ -165,19 +165,19 @@ describe("classifyTransaction", () => {
     expect(c.ruleUsed).toContain("Wyndham");
   });
 
-  it("does NOT match Wyndham with negative amount (direction in)", () => {
-    const c = classifyTransaction(txWithCompany("Wyndham Investment Group LLC", -675, "valoris-capital-partners"));
+  it("does NOT match Wyndham with negative amount", () => {
+    const c = classifyTransaction(tx("Wyndham Investment Group LLC", -675));
     expect(c.finalCategory).toBe("Uncategorized / Needs Review");
   });
 
-  it("does NOT match Wyndham for another company without rule", () => {
+  it("matches Wyndham regardless of companyId (pattern-based)", () => {
     const c = classifyTransaction(txWithCompany("Wyndham Investment Group LLC", 675, "other-company"));
-    expect(c.finalCategory).toBe("Uncategorized / Needs Review");
+    expect(c.finalCategory).toBe("Operating / merchant income");
   });
 
-  it("does NOT match similar-but-not-identical name", () => {
-    const c = classifyTransaction(txWithCompany("Wyndham Investment Group Inc", 675, "valoris-capital-partners"));
-    expect(c.finalCategory).toBe("Uncategorized / Needs Review");
+  it("matches similar name Wyndham Investment Group Inc", () => {
+    const c = classifyTransaction(tx("Wyndham Investment Group Inc", 675));
+    expect(c.finalCategory).toBe("Operating / merchant income");
   });
 
   it("falls back for unknown payee with positive deposit", () => {
@@ -185,8 +185,8 @@ describe("classifyTransaction", () => {
     expect(c.finalCategory).toBe("Uncategorized / Needs Review");
   });
 
-  it("works without companyId (backward compat)", () => {
-    const c = classifyTransaction(txWithCompany("Wyndham Investment Group LLC", 675));
-    expect(c.finalCategory).toBe("Uncategorized / Needs Review");
+  it("works without companyId (pattern-based, backward compat)", () => {
+    const c = classifyTransaction(tx("Wyndham Investment Group LLC", 675));
+    expect(c.finalCategory).toBe("Operating / merchant income");
   });
 });

@@ -15,6 +15,9 @@ export function buildReportsFromClassifications(
   const liabilities: Record<string, number> = {};
   const equity: Record<string, number> = {};
 
+  // Review policy: only "excluded" and "Uncategorized" are filtered from reports.
+  // Items with card_statements_needed, support_needed, cpa_review, or pending
+  // remain included — they are correctly classified and should appear in reports.
   for (const row of rows) {
     const c = row.classification;
     const amount = row.transaction.amount;

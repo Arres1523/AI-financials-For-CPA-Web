@@ -32,7 +32,8 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
 
   // ─── P&L Sheet ──────────────────────────────────────────────
   const pnl = workbook.addWorksheet(`P&L ${input.taxYear}`, { views: [{ showGridLines: false }] });
-  pnl.columns = [{ width: 36 }, { width: 18 }];
+  pnl.getColumn(1).width = 40;
+  pnl.getColumn(2).width = 22;
 
   headerRow(pnl.getCell("A1"), input.companyName);
   pnl.mergeCells("A1:B1");
@@ -45,6 +46,8 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
   pnl.getCell("A4").value = "⚠ PRELIMINARY — Based on bank activity only. Does not substitute CPA review.";
   pnl.getCell("A4").font = { bold: true, color: { argb: "CC5500" } };
   pnl.mergeCells("A4:B4");
+  pnl.getRow(4).height = 40;
+  pnl.getCell("A4").alignment = { wrapText: true };
 
   pnl.addRow([]);
   pnl.addRow(["Category", "Amount"]);
@@ -91,8 +94,14 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
   pnl.getCell(`B${niRow}`).font = { bold: true, italic: true };
 
   // ─── Preliminary Balance Sheet from Bank Activity ──────────
-  const bs = workbook.addWorksheet("Balance Sheet", { views: [{ showGridLines: false }] });
-  bs.columns = [{ width: 38 }, { width: 18 }];
+  const bs = workbook.addWorksheet("Balance Sheet", { views: [{ state: "frozen", xSplit: 0, ySplit: 1, showGridLines: false }] });
+  bs.getColumn(1).width = 45;
+  bs.getColumn(2).width = 22;
+  bs.getColumn(3).width = 16;
+  bs.getColumn(4).width = 16;
+  bs.getColumn(5).width = 16;
+  bs.getColumn(6).width = 16;
+  bs.getColumn(7).width = 16;
 
   headerRow(bs.getCell("A1"), input.companyName);
   bs.mergeCells("A1:B1");
@@ -105,6 +114,8 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
   bs.getCell("A4").value = "⚠ PRELIMINARY — This report is based on classified bank activity and does not represent actual period-end account balances. Only imported bank movements are included. Does not substitute CPA review.";
   bs.getCell("A4").font = { bold: true, color: { argb: "CC5500" } };
   bs.mergeCells("A4:B4");
+  bs.getRow(4).height = 40;
+  bs.getCell("A4").alignment = { wrapText: true };
 
   bs.addRow([]);
   bs.addRow(["Category", "Amount"]);
@@ -149,6 +160,8 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
     bs.addRow(["⚠ The Balance Sheet does not balance. Possible missing accounts or data."]);
     bs.getCell(`A${bs.rowCount}`).font = { italic: true, color: { argb: "CC5500" } };
     bs.mergeCells(`A${bs.rowCount}:B${bs.rowCount}`);
+    bs.getCell(`A${bs.rowCount}`).alignment = { wrapText: true };
+    bs.getRow(bs.rowCount).height = 30;
   }
 
   // ─── Reconciliation Summary ─────────────────────────────────
@@ -156,6 +169,7 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
   bs.addRow([]);
   bs.addRow(["RECONCILIATION BY ACCOUNT"]);
   bold(bs.getCell(`A${reconRows + 1}`));
+  bs.mergeCells(`A${bs.rowCount}:G${bs.rowCount}`);
   bs.addRow(["Account", "Opening", "Movement", "Expected Close", "Closing", "Variance", "Status"]);
   const reconHeader = bs.rowCount;
   for (let c = 1; c <= 7; c++) bold(bs.getCell(reconHeader, c));
@@ -178,16 +192,17 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
   bs.addRow(["  without verification by a qualified CPA."]);
   for (let r = bs.rowCount - 4; r <= bs.rowCount; r++) {
     bs.getCell(`A${r}`).font = { italic: true, color: { argb: "666666" } };
+    bs.getCell(`A${r}`).alignment = { wrapText: true };
   }
 
   // ─── Transaction History (optional) ─────────────────────────
   if (input.includeTransactions) {
-    const th = workbook.addWorksheet("Transaction History", { views: [{ showGridLines: false }] });
+    const th = workbook.addWorksheet("Transaction History", { views: [{ state: "frozen", xSplit: 0, ySplit: 1, showGridLines: false }] });
     th.columns = [
-      { header: "Date", key: "date", width: 14 },
-      { header: "Description", key: "description", width: 50 },
-      { header: "Amount", key: "amount", width: 16 },
-      { header: "Final Category", key: "finalCategory", width: 28 },
+      { header: "Date", key: "date", width: 16 },
+      { header: "Description", key: "description", width: 60 },
+      { header: "Amount", key: "amount", width: 18 },
+      { header: "Final Category", key: "finalCategory", width: 32 },
     ];
     th.getRow(1).font = { bold: true };
 
@@ -206,6 +221,12 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
       });
       row.getCell(1).numFmt = "yyyy-mm-dd";
       row.getCell(3).numFmt = fmt;
+    }
+    if (th.rowCount > 1) {
+      th.autoFilter = {
+        from: { row: 1, column: 1 },
+        to: { row: th.rowCount, column: 4 },
+      };
     }
   }
 

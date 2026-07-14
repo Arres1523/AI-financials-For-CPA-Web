@@ -4,6 +4,7 @@ import React from "react";
 import { useState, useEffect } from "react";
 import type { Workspace, Company, BankAccount, ReconciliationResult, TransactionWithClassification } from "@/domain/types";
 import { buildReports } from "@/domain/reporting";
+import { requiresReview } from "@/domain/reviewPolicy";
 
 type Props = {
   workspace: Workspace;
@@ -35,11 +36,11 @@ export default function ResultsStep({ workspace, company, accounts, reconciliati
 
   const reports = buildReports(company.legalName, workspace.taxYear, transactions);
   const hasWarnings = Math.abs(reports.balanceSheet.balanceCheck) > 0.01 ||
-    transactions.some((t) => t.classification?.reviewStatus === "pending") ||
+    transactions.some((t) => requiresReview(t.classification)) ||
     reconciliation.some((r) => r.status === "unreconciled");
 
   const totalImported = transactions.length;
-  const pendingReview = transactions.filter((t) => t.classification?.reviewStatus === "pending").length;
+  const pendingReview = transactions.filter((t) => requiresReview(t.classification)).length;
 
   async function handleExport(withTransactions: boolean) {
     setExportType(withTransactions ? "withTransactions" : "financial");

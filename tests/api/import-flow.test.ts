@@ -19,6 +19,8 @@ async function json(method: string, url: string, body?: unknown) {
 
 // These tests require the dev server to be running on port 3001
 // Run: PORT=3001 pnpm dev & before executing
+// Integration tests: run in CI or when INTEGRATION=true is set.
+// Requires a dev server on port 3001 with a test database.
 describe.runIf(!!process.env.CI || !!process.env.INTEGRATION)("Import API integration", () => {
   let companyId: string;
   let workspaceId: string;

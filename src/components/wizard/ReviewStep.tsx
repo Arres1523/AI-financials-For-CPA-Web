@@ -3,6 +3,7 @@ import React from "react";
 
 import { useState, useEffect, useCallback } from "react";
 import type { TransactionWithClassification, Workspace } from "@/domain/types";
+import { requiresReview } from "@/domain/reviewPolicy";
 
 const CATEGORIES_BY_REPORT: Record<string, string[]> = {
   "P&L": ["Rental Income", "Other Income", "Repairs & Maintenance", "Utilities", "Insurance", "Property Taxes", "Legal & Accounting", "Management Fees", "Bank Fees", "Interest Expense", "Rent Expense", "Other Expense"],
@@ -78,8 +79,9 @@ export default function ReviewStep({ workspace, onComplete, onBack }: Props) {
     return t.description.toLowerCase().includes(q) || (t.classification?.finalCategory ?? "").toLowerCase().includes(q);
   });
 
-  const pendingCount = items.filter((t) => t.classification?.reviewStatus === "pending").length;
-  const allResolved = pendingCount === 0;
+  const itemsNeedingReview = items.filter((t) => requiresReview(t.classification));
+  const pendingCount = itemsNeedingReview.length;
+  const allResolved = itemsNeedingReview.length === 0;
 
   if (loading) return <p className="text-sm text-slate-500">Loading transactions…</p>;
 
@@ -103,7 +105,7 @@ export default function ReviewStep({ workspace, onComplete, onBack }: Props) {
         </div>
       </div>
 
-      {allResolved && items.length === 0 ? (
+      {allResolved ? (
         <div className="rounded border border-sage/30 bg-sage/5 p-6 text-center">
           <p className="text-sage font-medium">No exceptions — all transactions are classified.</p>
           <p className="mt-1 text-sm text-slate-500">You can proceed to results.</p>
@@ -148,6 +150,7 @@ export default function ReviewStep({ workspace, onComplete, onBack }: Props) {
                   <th className="px-3 py-2">Category</th>
                   <th className="px-3 py-2">Confidence</th>
                   <th className="px-3 py-2">Rule</th>
+                  <th className="px-3 py-2">Status</th>
                   <th className="px-3 py-2">Actions</th>
                 </tr>
               </thead>
@@ -194,6 +197,18 @@ export default function ReviewStep({ workspace, onComplete, onBack }: Props) {
                       </td>
                       <td className="px-3 py-2 text-xs text-slate-500 max-w-[200px] truncate" title={c?.ruleUsed ?? ""}>
                         {c?.ruleUsed ?? "—"}
+                      </td>
+                      <td className="px-3 py-2">
+                        {c?.reviewStatus && c.reviewStatus !== "approved" && c.reviewStatus !== "excluded" ? (
+                          <span className="text-xs font-medium text-brass">
+                            {c.reviewStatus === "card_statements_needed" ? "Card statements needed" :
+                             c.reviewStatus === "cpa_review" ? "CPA review required" :
+                             c.reviewStatus === "support_needed" ? "Support needed" :
+                             "Pending"}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
+                        )}
                       </td>
                       <td className="px-3 py-2">
                         <div className="flex gap-1">

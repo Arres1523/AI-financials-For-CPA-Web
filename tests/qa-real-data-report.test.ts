@@ -1,34 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { classifyTransaction } from "../src/domain/classification";
 import type { Transaction, Classification } from "../src/domain/types";
-
-type CanonicalCategoryId =
-  | "intercompany_transfer_in"
-  | "intercompany_transfer_out"
-  | "credit_card_clearing"
-  | "merchant_processing_fees"
-  | "bank_service_charges"
-  | "other_ach_income"
-  | "operating_merchant_income"
-  | "project_cost_pending_support";
-
-const CANONICAL: Record<string, CanonicalCategoryId> = {
-  "Intercompany / related-party transfer in": "intercompany_transfer_in",
-  "Transfer Clearing": "intercompany_transfer_in",
-  "Intercompany / related-party transfer out": "intercompany_transfer_out",
-  "Credit card clearing / due from support": "credit_card_clearing",
-  "Credit card payable": "credit_card_clearing",
-  "Merchant / processing fees": "merchant_processing_fees",
-  "Merchant Processing Fees": "merchant_processing_fees",
-  "Bank service charges": "bank_service_charges",
-  "Bank Fees": "bank_service_charges",
-  "Other ACH income": "other_ach_income",
-  "Other Income": "other_ach_income",
-  "Operating / merchant income": "operating_merchant_income",
-  "Project feasibility cost pending support": "project_cost_pending_support",
-  "Project/vendor cost pending capitalization support": "project_cost_pending_support",
-  "Wire Transfers": "project_cost_pending_support",
-};
+import { LABEL_TO_CANONICAL, resolveCanonical } from "../src/domain/canonicalCategories";
+import type { CanonicalCategoryId } from "../src/domain/canonicalCategories";
 
 function tx(id: string, desc: string, amt: number, date: string, companyId?: string): Transaction {
   return { id, workspaceId: "ws-qa", bankAccountId: "ba-chase-2978", statementId: "st-real", date, description: desc, amount: amt, balance: null, originalRowIndex: 0, createdAt: "2025-01-01T00:00:00.000Z", companyId };
@@ -111,6 +85,12 @@ describe("QA: Real Data vs CPA", () => {
     const confMatch = results.filter(r => r.official.confidence.toLowerCase() === r.system.confidence.toLowerCase()).length;
     const catExact = results.filter(r => r.official.category.toLowerCase() === r.system.finalCategory.toLowerCase()).length;
 
+    const canonicalMatch = results.filter(r => {
+      const cpa = resolveCanonical(r.official.category);
+      const sys = resolveCanonical(r.system.finalCategory);
+      return cpa !== null && sys !== null && cpa === sys;
+    }).length;
+
     const bsR = results.filter(r => r.official.treatment === "Balance Sheet");
     const pnlR = results.filter(r => r.official.treatment === "P&L");
 
@@ -139,6 +119,7 @@ describe("QA: Real Data vs CPA", () => {
     console.log(`\n📊 GLOBAL METRICS`);
     console.log(`   Transactions tested:  ${transactionsTested}`);
     console.log(`   Exact category match: ${catExact}/${transactionsTested} (${(catExact/transactionsTested*100).toFixed(1)}%)`);
+    console.log(`   Canonical match:      ${canonicalMatch}/${transactionsTested} (${(canonicalMatch/transactionsTested*100).toFixed(1)}%)`);
     console.log(`   ReportType match:     ${transactionsTested - reportTypeMismatches}/${transactionsTested} (${((transactionsTested-reportTypeMismatches)/transactionsTested*100).toFixed(1)}%)`);
     console.log(`   Confidence match:     ${confMatch}/${transactionsTested} (${(confMatch/transactionsTested*100).toFixed(1)}%)`);
     console.log(`   Unexpected fallbacks: ${unexpectedFallbacks}`);
@@ -226,5 +207,6 @@ describe("QA: Real Data vs CPA", () => {
     expect(reportTypeMismatches).toBe(0);
     expect(unexpectedFallbacks).toBe(0); // Counterparty rules handle Wyndham
     expect(highConfidenceErrors).toBe(0);
+    expect(canonicalMatch).toBeDefined();
   });
 });

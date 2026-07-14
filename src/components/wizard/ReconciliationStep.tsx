@@ -1,7 +1,7 @@
 "use client";
 import React from "react";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type { Workspace, BankAccount, Transaction, Classification, ReconciliationResult } from "@/domain/types";
 import { reconcileAccountPeriod } from "@/domain/reconciliation";
 
@@ -15,6 +15,8 @@ type Props = {
 export default function ReconciliationStep({ workspace, accounts, onComplete, onBack }: Props) {
   const [results, setResults] = useState<ReconciliationResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const [openingEntries, setOpeningEntries] = useState<Array<{accountName: string; accountType: string; amount: number}>>([]);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -37,8 +39,63 @@ export default function ReconciliationStep({ workspace, accounts, onComplete, on
     load();
   }, [workspace.id, accounts]);
 
+  useEffect(() => {
+    async function load() {
+      const res = await fetch(`/api/opening-balances?workspaceId=${workspace.id}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.length > 0) {
+        setOpeningEntries(data.map((e: any) => ({
+          accountName: e.accountName,
+          accountType: e.accountType,
+          amount: e.amount,
+        })));
+      }
+    }
+    load();
+  }, [workspace.id]);
+
   const hasUnreconciled = results.some((r) => r.status === "unreconciled");
   const hasNoBalances = results.some((r) => r.openingBalance === 0 && r.closingBalance === 0);
+
+  const totals = useMemo(() => {
+    const assets = openingEntries.filter(e => e.accountType === "asset").reduce((s, e) => s + e.amount, 0);
+    const liabilities = openingEntries.filter(e => e.accountType === "liability").reduce((s, e) => s + e.amount, 0);
+    const equity = openingEntries.filter(e => e.accountType === "equity").reduce((s, e) => s + e.amount, 0);
+    const diff = Math.round((assets - liabilities - equity) * 100) / 100;
+    return { assets, liabilities, equity, diff, isValid: Math.abs(diff) <= 0.01 };
+  }, [openingEntries]);
+
+  function addEntry(type: string) {
+    setOpeningEntries(prev => [...prev, { accountName: "", accountType: type, amount: 0 }]);
+  }
+
+  function removeEntry(index: number) {
+    setOpeningEntries(prev => prev.filter((_, i) => i !== index));
+  }
+
+  function updateEntry(index: number, field: string, value: string | number) {
+    setOpeningEntries(prev => prev.map((e, i) => i === index ? { ...e, [field]: value } : e));
+  }
+
+  async function handleSaveOpeningBalances() {
+    setSaving(true);
+    await fetch("/api/opening-balances", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        workspaceId: workspace.id,
+        entries: openingEntries.map(e => ({
+          accountName: e.accountName,
+          accountType: e.accountType,
+          amount: e.amount,
+          source: "manual",
+          supportStatus: "provided",
+        })),
+      }),
+    });
+    setSaving(false);
+  }
 
   if (loading) return <p className="text-sm text-slate-500">Loading reconciliation data…</p>;
 
@@ -93,6 +150,73 @@ export default function ReconciliationStep({ workspace, accounts, onComplete, on
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div className="rounded border border-line p-4">
+        <h3 className="mb-2 text-sm font-semibold">Opening Balance Sheet</h3>
+        <p className="mb-3 text-xs text-slate-500">Enter opening balances to enable Balance Sheet mode.</p>
+        {["asset", "liability", "equity"].map(type => {
+          const typeEntries = openingEntries.filter(e => e.accountType === type);
+          const total = type === "asset" ? totals.assets : type === "liability" ? totals.liabilities : totals.equity;
+          return (
+            <div key={type} className="mb-3">
+              <div className="mb-1 flex items-center justify-between">
+                <span className="text-sm font-medium capitalize">{type}s</span>
+                <span className="text-sm text-slate-600">Total: ${total.toFixed(2)}</span>
+              </div>
+              <div className="space-y-1">
+                {typeEntries.map((entry, i) => {
+                  const globalIndex = openingEntries.indexOf(entry);
+                  return (
+                    <div key={globalIndex} className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        placeholder="Account name"
+                        value={entry.accountName}
+                        onChange={e => updateEntry(globalIndex, "accountName", e.target.value)}
+                        className="w-48 rounded border border-line p-2 text-sm"
+                      />
+                      <input
+                        type="number"
+                        placeholder="Amount"
+                        value={entry.amount}
+                        onChange={e => updateEntry(globalIndex, "amount", parseFloat(e.target.value) || 0)}
+                        className="w-28 rounded border border-line p-2 text-sm"
+                      />
+                      <button onClick={() => removeEntry(globalIndex)} className="text-xs text-red-500">✕</button>
+                    </div>
+                  );
+                })}
+              </div>
+              <button onClick={() => addEntry(type)} className="mt-1 text-xs text-slate-500 hover:text-ink">+ Add {type}</button>
+            </div>
+          );
+        })}
+        <div className="mt-3 border-t border-line pt-3">
+          <div className="text-sm">
+            <span>Assets: ${totals.assets.toFixed(2)}</span>
+            <span className="mx-2">−</span>
+            <span>Liabilities: ${totals.liabilities.toFixed(2)}</span>
+            <span className="mx-2">−</span>
+            <span>Equity: ${totals.equity.toFixed(2)}</span>
+            <span className="mx-2">=</span>
+            <span className={totals.isValid ? "text-sage font-semibold" : "text-red-600 font-semibold"}>
+              ${totals.diff.toFixed(2)}
+            </span>
+            {totals.isValid ? (
+              <span className="ml-2 text-xs text-sage">✓ Balanced</span>
+            ) : (
+              <span className="ml-2 text-xs text-red-600">Does not balance</span>
+            )}
+          </div>
+        </div>
+        <button
+          onClick={handleSaveOpeningBalances}
+          disabled={saving}
+          className="mt-3 rounded bg-ink px-4 py-2 text-sm text-white disabled:opacity-50"
+        >
+          {saving ? "Saving..." : "Save Opening Balances"}
+        </button>
       </div>
 
       <div className="rounded border border-brass/30 bg-brass/5 p-4 text-sm text-brass space-y-1">

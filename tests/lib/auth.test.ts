@@ -58,4 +58,30 @@ describe("auth helpers", () => {
       status: 503,
     });
   });
+
+  it("allows access to auth paths without authentication", async () => {
+    const { getAccessDecision } = await import("@/lib/auth");
+
+    expect(getAccessDecision("/register", false)).toEqual({ allowed: true });
+    expect(getAccessDecision("/forgot-password", false)).toEqual({ allowed: true });
+    expect(getAccessDecision("/forgot-password/some-token", false)).toEqual({ allowed: true });
+    expect(getAccessDecision("/update-password", false)).toEqual({ allowed: true });
+    expect(getAccessDecision("/auth/callback?code=xxx", false)).toEqual({ allowed: true });
+  });
+});
+
+describe("UnauthorizedError", () => {
+  it("is an instance of Error with name UnauthorizedError", async () => {
+    const { UnauthorizedError } = await import("@/lib/auth");
+    const err = new UnauthorizedError();
+    expect(err).toBeInstanceOf(Error);
+    expect(err.name).toBe("UnauthorizedError");
+    expect(err.message).toBe("Authentication required");
+  });
+
+  it("accepts custom message", async () => {
+    const { UnauthorizedError } = await import("@/lib/auth");
+    const err = new UnauthorizedError("Custom message");
+    expect(err.message).toBe("Custom message");
+  });
 });

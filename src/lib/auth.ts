@@ -1,3 +1,10 @@
+export class UnauthorizedError extends Error {
+  constructor(message = "Authentication required") {
+    super(message);
+    this.name = "UnauthorizedError";
+  }
+}
+
 type AccessDecision =
   | { allowed: true }
   | { allowed: false; redirectTo: string }
@@ -27,7 +34,13 @@ function isPublicPath(pathname: string): boolean {
 }
 
 function isAuthPath(pathname: string): boolean {
-  return pathname === "/login";
+  return (
+    pathname === "/login" ||
+    pathname === "/register" ||
+    pathname.startsWith("/forgot-password") ||
+    pathname.startsWith("/update-password") ||
+    pathname.startsWith("/auth/callback")
+  );
 }
 
 export function getSupabaseEnv() {
@@ -35,6 +48,14 @@ export function getSupabaseEnv() {
     url: getEnv("NEXT_PUBLIC_SUPABASE_URL"),
     publishableKey: getEnv("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"),
   };
+}
+
+export async function requireUser(): Promise<{ id: string; email: string }> {
+  const { createClient } = await import("@/lib/supabase/server");
+  const supabase = await createClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) throw new UnauthorizedError("Authentication required");
+  return { id: user.id, email: user.email! };
 }
 
 export function getAccessDecision(

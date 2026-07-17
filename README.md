@@ -30,6 +30,29 @@ pnpm test:e2e     # Playwright E2E tests
 pnpm build        # production build
 ```
 
+## Access protection
+
+The app now uses Supabase Auth for every page and API route.
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
+```
+
+Set both variables in `.env.local` before starting the app. Users will see `/login`, and every unauthenticated API request returns `401`.
+
+Recommended Supabase Auth setup:
+
+- disable public signups
+- create approved users in the Supabase Auth dashboard
+- use email/password sign-in for this app
+
+If you deploy on Supabase, also run [supabase/security/2026-07-15-lockdown.sql](/Users/miguel-mac/Documents/valoris/AI Financials for CPA Web/supabase/security/2026-07-15-lockdown.sql) in the SQL editor to:
+
+- revoke `anon` access to application tables
+- allow only `authenticated` users through RLS policies
+- create a private storage bucket for financial documents
+
 ## Quick start
 
 1. Open `http://localhost:3000`.
@@ -55,5 +78,5 @@ pnpm build        # production build
 - No external AI inference — classification is rule-based.
 - Balance Sheet is explicitly preliminary — based on classified bank activity, not full accounting records.
 - No automatic journal entries, tax basis calculations, or QuickBooks integration.
-- No authentication, multi-user, or cloud persistence (beyond Supabase hosting).
+- Supabase Auth protects access, but the current RLS policy is still workspace-wide for all authenticated users rather than per-user row ownership.
 - `classification_rules` table exists but is reserved for a future phase — no automatic learning.

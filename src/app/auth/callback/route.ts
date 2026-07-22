@@ -12,6 +12,7 @@ export async function GET(request: Request) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
+      fetch(`${origin}/api/emails/welcome`, { method: "POST" }).catch(() => {});
       return NextResponse.redirect(`${origin}${next}`);
     }
   }

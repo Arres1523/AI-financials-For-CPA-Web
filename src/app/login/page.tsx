@@ -1,12 +1,13 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { isSupabaseAuthConfigured } from "@/lib/auth";
 import LoginForm from "./LoginForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function LoginPage() {
-  try {
+  if (isSupabaseAuthConfigured()) {
     const supabase = await createClient();
     const {
       data: { user },
@@ -15,8 +16,6 @@ export default async function LoginPage() {
     if (user) {
       redirect("/");
     }
-  } catch {
-    // Missing environment variables are handled by the login form message.
   }
 
   return (

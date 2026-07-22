@@ -17,14 +17,25 @@ export default function LoginForm() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (setupError) {
+      setError("Supabase auth is not configured.");
+      return;
+    }
+
     setIsSubmitting(true);
     setError(null);
 
-    const supabase = createClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    let signInError: { message: string } | null = null;
+    try {
+      const supabase = createClient();
+      const result = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      signInError = result.error;
+    } catch {
+      signInError = { message: "Supabase auth is not configured." };
+    }
 
     if (signInError) {
       setError(signInError.message);

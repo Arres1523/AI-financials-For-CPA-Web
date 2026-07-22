@@ -1,14 +1,24 @@
-import React from "react";
-import Wizard from "@/components/wizard/Wizard";
-import LogoutButton from "@/components/auth/LogoutButton";
+import { redirect } from "next/navigation";
+import { isSupabaseAuthConfigured } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
+import AuthenticatedHome from "./AuthenticatedHome";
 
-export default function Page() {
-  return (
-    <>
-      <div className="mx-auto flex max-w-5xl justify-end px-4 pt-4">
-        <LogoutButton />
-      </div>
-      <Wizard />
-    </>
-  );
+export const dynamic = "force-dynamic";
+
+export default async function Page() {
+  if (!isSupabaseAuthConfigured()) {
+    redirect("/login?error=setup");
+  }
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+
+  if (error || !user) {
+    redirect("/login");
+  }
+
+  return <AuthenticatedHome />;
 }

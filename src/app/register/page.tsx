@@ -1,16 +1,17 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { isSupabaseAuthConfigured } from "@/lib/auth";
 import RegisterForm from "./RegisterForm";
 
 export const dynamic = "force-dynamic";
 
 export default async function RegisterPage() {
-  try {
+  if (isSupabaseAuthConfigured()) {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (user) redirect("/");
-  } catch {}
+  }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[#000000] px-4 py-12 font-mono">

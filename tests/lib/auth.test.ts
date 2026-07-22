@@ -39,6 +39,10 @@ describe("auth helpers", () => {
   it("redirects anonymous page requests to the login screen", async () => {
     const { getAccessDecision } = await import("@/lib/auth");
 
+    expect(getAccessDecision("/", false)).toEqual({
+      allowed: false,
+      redirectTo: "/login",
+    });
     expect(getAccessDecision("/wizard", false)).toEqual({
       allowed: false,
       redirectTo: "/login",
@@ -49,6 +53,10 @@ describe("auth helpers", () => {
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = "";
     const { getAccessDecision } = await import("@/lib/auth");
 
+    expect(getAccessDecision("/", false)).toEqual({
+      allowed: false,
+      redirectTo: "/login?error=setup",
+    });
     expect(getAccessDecision("/wizard", false)).toEqual({
       allowed: false,
       redirectTo: "/login?error=setup",

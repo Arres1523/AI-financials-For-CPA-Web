@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import LoginForm from "@/app/login/LoginForm";
 
 const mockSignIn = vi.fn();
+let mockSearchParams = new URLSearchParams();
 
 vi.mock("@/lib/supabase/browser", () => ({
   createClient: () => ({
@@ -15,12 +16,13 @@ vi.mock("@/lib/supabase/browser", () => ({
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => mockSearchParams,
 }));
 
 describe("LoginForm", () => {
   beforeEach(() => {
     mockSignIn.mockReset();
+    mockSearchParams = new URLSearchParams();
   });
 
   it("renders email and password fields", () => {
@@ -64,5 +66,21 @@ describe("LoginForm", () => {
 
     const button = screen.getByRole("button", { name: /signing in/i });
     expect((button as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("does not submit when auth setup is missing", async () => {
+    mockSearchParams = new URLSearchParams("error=setup");
+
+    render(<LoginForm />);
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "test@test.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "password" },
+    });
+    fireEvent.submit(screen.getByRole("button", { name: /sign in/i }));
+
+    expect(mockSignIn).not.toHaveBeenCalled();
+    expect(screen.getByText("Supabase auth is not configured.")).toBeDefined();
   });
 });

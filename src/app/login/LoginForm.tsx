@@ -92,6 +92,12 @@ export default function LoginForm() {
       >
         {isSubmitting ? "Signing in..." : "Sign in"}
       </button>
+      <p className="text-center text-sm text-slate-600">
+        New here?{" "}
+        <a href="/register" className="font-medium text-sage underline">
+          Create account
+        </a>
+      </p>
     </form>
   );
 }

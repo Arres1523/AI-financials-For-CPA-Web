@@ -29,6 +29,9 @@ describe("LoginForm", () => {
     render(<LoginForm />);
     expect(screen.getByLabelText("Email")).toBeDefined();
     expect(screen.getByLabelText("Password")).toBeDefined();
+    const createAccountLink = screen.getByRole("link", { name: /create account/i });
+    expect(createAccountLink).toBeDefined();
+    expect(createAccountLink.getAttribute("href")).toBe("/register");
   });
 
   it("shows error for invalid credentials", async () => {

@@ -5,6 +5,11 @@
       "type": "remote",
       "url": "https://mcp.supabase.com/mcp?project_ref=skkyxecpcoeapectkvtr&read_only=true",
       "enabled": true
+    },
+    "resend": {
+      "type": "remote",
+      "url": "https://mcp.resend.com/mcp",
+      "enabled": true
     }
   }
 }

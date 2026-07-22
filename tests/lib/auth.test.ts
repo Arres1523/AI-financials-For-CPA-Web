@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 
 describe("auth helpers", () => {
@@ -75,6 +77,11 @@ describe("auth helpers", () => {
     expect(getAccessDecision("/forgot-password/some-token", false)).toEqual({ allowed: true });
     expect(getAccessDecision("/update-password", false)).toEqual({ allowed: true });
     expect(getAccessDecision("/auth/callback?code=xxx", false)).toEqual({ allowed: true });
+  });
+
+  it("uses direct public env access so Next.js can inline browser values", () => {
+    const source = readFileSync(join(process.cwd(), "src/lib/auth.ts"), "utf8");
+    expect(source).not.toContain("process.env[name]");
   });
 });
 

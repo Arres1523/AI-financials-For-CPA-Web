@@ -19,14 +19,14 @@ export default async function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-paper px-4 py-12">
-      <section className="w-full max-w-md rounded-2xl border border-line bg-white p-8 shadow-sm">
-        <p className="text-xs uppercase tracking-[0.24em] text-sage">Private Workspace</p>
-        <h1 className="mt-2 text-2xl font-semibold text-ink">Protected financial data</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-600">
-          Sign in with a Supabase Auth user to continue. Keep public signups disabled and invite approved users only.
+    <main className="flex min-h-screen items-center justify-center bg-paper px-4 py-10 font-mono">
+      <section className="w-full max-w-sm border border-line bg-white p-5">
+        <p className="text-xs font-semibold text-sage">Private Workspace</p>
+        <h1 className="mt-2 text-xl font-semibold text-ink">Protected financial data</h1>
+        <p className="mt-2 text-xs leading-5 text-slate-500">
+          Sign in with a Supabase Auth user to continue.
         </p>
-        <div className="mt-6">
+        <div className="mt-5">
           <Suspense>
             <LoginForm />
           </Suspense>

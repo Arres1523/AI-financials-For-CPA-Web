@@ -74,15 +74,20 @@ export default function Wizard() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8">
-      <div className="mb-6">
-        <p className="text-xs uppercase tracking-wide text-sage">AI Financials for CPA Web</p>
-        <h1 className="mt-1 text-2xl font-semibold">Annual Financial Workflow</h1>
+    <div className="mx-auto max-w-6xl px-4 py-5">
+      <div className="mb-4 flex flex-wrap items-end justify-between gap-3 border-b border-line pb-4">
+        <div>
+          <h1 className="text-xl font-semibold text-ink">Annual Financial Workflow</h1>
+          <p className="mt-1 max-w-[72ch] text-xs leading-5 text-slate-500">
+            Import bank statements, review classifications, reconcile accounts, and export CPA-ready reports.
+          </p>
+        </div>
+        <p className="text-xs text-slate-500">Step {step} of {steps.length}</p>
       </div>
 
       <StepIndicator steps={steps.map((s) => ({ ...s, status: stepStatus(s.id) }))} />
 
-      <div className="rounded border border-line bg-white p-6">
+      <div className="border border-line bg-white p-4 md:p-5">
         {step === 1 && <CompanyStep onComplete={handleCompanyComplete} />}
         {step === 2 && company && <BankAccountsStep company={company} onComplete={handleAccountsComplete} />}
         {step === 3 && workspace && accounts.length > 0 && (

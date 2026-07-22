@@ -38,7 +38,7 @@ export default function ColumnMapper({ columns, detected, onChange }: Props) {
 
   return (
     <div className="space-y-3">
-      <p className="text-sm font-medium">Column Mapping — match each field to a column</p>
+      <p className="text-sm font-medium">Column Mapping: match each field to a column</p>
       <div className="grid grid-cols-[1fr_2fr] gap-2 text-sm">
         {FIELDS.map(({ key, label, required }) => {
           if (key === "debit" || key === "credit") {
@@ -56,7 +56,7 @@ export default function ColumnMapper({ columns, detected, onChange }: Props) {
                 value={current[key] || ""}
                 onChange={(e) => update(key, e.target.value)}
               >
-                <option value="">— Select —</option>
+                <option value="">Select</option>
                 {columns.map((col) => (
                   <option key={col} value={col}>
                     {col} {detected[key] === col ? "(detected)" : ""}

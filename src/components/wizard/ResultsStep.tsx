@@ -76,7 +76,7 @@ export default function ResultsStep({ workspace, company, accounts, reconciliati
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="rounded border border-line p-3">
           <p className="text-xs text-slate-500">Statements imported</p>
-          <p className="text-2xl font-semibold">{statementCount || (totalImported > 0 ? "✓" : "—")}</p>
+          <p className="text-2xl font-semibold">{statementCount || (totalImported > 0 ? "Imported" : "None")}</p>
         </div>
         <div className="rounded border border-line p-3">
           <p className="text-xs text-slate-500">Transactions imported</p>
@@ -88,7 +88,7 @@ export default function ResultsStep({ workspace, company, accounts, reconciliati
         </div>
         <div className="rounded border border-line p-3">
           <p className="text-xs text-slate-500">Report Mode</p>
-          <p className="text-sm font-semibold">{reports.mode === "complete_balance_sheet" ? "✓ Complete" : reports.mode === "preliminary_balance_sheet" ? "⚠ Preliminary" : "ℹ Bank Activity"}</p>
+          <p className="text-sm font-semibold">{reports.mode === "complete_balance_sheet" ? "Complete" : reports.mode === "preliminary_balance_sheet" ? "Preliminary" : "Bank Activity"}</p>
         </div>
         <div className="rounded border border-line p-3">
           <p className="text-xs text-slate-500">Bank Reconciliation</p>
@@ -111,16 +111,16 @@ export default function ResultsStep({ workspace, company, accounts, reconciliati
         <div className="rounded border border-line p-3">
           <p className="text-xs text-slate-500">Equation Check</p>
           <p className={`text-2xl font-semibold ${reports.accountingEquation.status === "passed" ? "text-sage" : "text-red-600"}`}>
-            {reports.accountingEquation.status === "passed" ? "✓" : reports.accountingEquation.status === "incomplete_data" ? "…" : "✕"}
+            {reports.accountingEquation.status === "passed" ? "Passed" : reports.accountingEquation.status === "incomplete_data" ? "Incomplete" : "Failed"}
           </p>
         </div>
       </div>
 
       {reconciliation.filter(r => r.status === "reconciled").length > 0 && (
         <div className="rounded border border-sage/30 bg-sage/5 p-3 text-sm text-sage">
-          ✓ {reconciliation.filter(r => r.status === "reconciled").length} account(s) reconciled
+          {reconciliation.filter(r => r.status === "reconciled").length} account(s) reconciled
           {reconciliation.some(r => r.status === "unreconciled") && (
-            <span className="text-brass"> · {reconciliation.filter(r => r.status === "unreconciled").length} unreconciled</span>
+            <span className="text-brass">. {reconciliation.filter(r => r.status === "unreconciled").length} unreconciled</span>
           )}
         </div>
       )}
@@ -128,38 +128,38 @@ export default function ResultsStep({ workspace, company, accounts, reconciliati
       {/* Alerts */}
       {reports.bankReconciliation.some(r => r.status === "unreconciled") && (
         <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          <p className="font-medium">✕ Bank Reconciliation</p>
+          <p className="font-medium">Bank Reconciliation</p>
           <p>One or more bank accounts have unreconciled transactions. The balance sheet may be inaccurate.</p>
         </div>
       )}
       {reports.classificationCompleteness.classified < reports.classificationCompleteness.totalTransactions && (
         <div className="rounded border border-brass/30 bg-brass/5 p-4 text-sm text-brass">
-          <p className="font-medium">⚠ Classification Incomplete</p>
+          <p className="font-medium">Classification Incomplete</p>
           <p>{reports.classificationCompleteness.classified} of {reports.classificationCompleteness.totalTransactions} transactions classified. {reports.classificationCompleteness.totalTransactions - reports.classificationCompleteness.classified} need classification.</p>
         </div>
       )}
       {reports.classificationCompleteness.documentationPending > 0 && reports.classificationCompleteness.classified === reports.classificationCompleteness.totalTransactions && (
         <div className="rounded border border-brass/30 bg-brass/5 p-4 text-sm text-brass">
-          <p className="font-medium">⚠ Documentation Pending</p>
+          <p className="font-medium">Documentation Pending</p>
           <p>{reports.classificationCompleteness.documentationPending} transaction(s) need supporting documents (card statements, CPA review, or support).</p>
         </div>
       )}
       {reports.accountingEquation.status !== "passed" && (
         <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          <p className="font-medium">✕ Accounting Equation</p>
+          <p className="font-medium">Accounting Equation</p>
           <p>Assets do not equal liabilities plus equity. The balance sheet is out of balance by {money(Math.abs(reports.balanceSheet.balanceCheck))}.</p>
         </div>
       )}
       {reports.suspense.length > 0 && (
         <div className="rounded border border-brass/30 bg-brass/5 p-4 text-sm text-brass">
-          <p className="font-medium">⚠ Suspense Items</p>
+          <p className="font-medium">Suspense Items</p>
           <p>{reports.suspense.length} transaction(s) could not be fully classified and have been placed in suspense accounts.</p>
         </div>
       )}
 
       {/* P&L Preview */}
       <div className="rounded border border-line p-4">
-        <h3 className="mb-2 text-sm font-semibold">P&amp;L Preview — {workspace.taxYear}</h3>
+        <h3 className="mb-2 text-sm font-semibold">P&amp;L Preview: {workspace.taxYear}</h3>
         <div className="grid grid-cols-[1fr_auto] gap-x-8 gap-y-1 text-sm">
           <span className="font-medium text-slate-600">Income</span>
           <span className="text-right">{money(Object.values(reports.pnl.income).reduce((s: number, v: number) => s + v, 0))}</span>
@@ -182,7 +182,7 @@ export default function ResultsStep({ workspace, company, accounts, reconciliati
 
       {/* BS Preview */}
       <div className="rounded border border-line p-4">
-        <h3 className="mb-2 text-sm font-semibold">Preliminary Balance Sheet from Bank Activity — {workspace.taxYear}</h3>
+        <h3 className="mb-2 text-sm font-semibold">Preliminary Balance Sheet from Bank Activity: {workspace.taxYear}</h3>
         <p className="mb-3 text-xs text-brass">This preliminary report is based on classified bank activity and does not represent actual period-end account balances. Only imported bank movements are included.</p>
         <div className="grid grid-cols-[1fr_auto] gap-x-8 gap-y-1 text-sm">
           <span className="col-span-2 mt-1 font-medium capitalize text-slate-600">Assets</span>
@@ -218,7 +218,7 @@ export default function ResultsStep({ workspace, company, accounts, reconciliati
             <div key={r.accountId} className="flex justify-between">
               <span>{r.accountName}</span>
               <span className={r.status === "reconciled" ? "text-sage" : "text-red-600"}>
-                {r.status === "reconciled" ? "✓ Reconciled" : `✕ ${money(r.variance)} difference`}
+                {r.status === "reconciled" ? "Reconciled" : `${money(r.variance)} difference`}
               </span>
             </div>
           ))}
@@ -232,17 +232,17 @@ export default function ResultsStep({ workspace, company, accounts, reconciliati
           disabled={exporting}
           className="rounded bg-sage px-6 py-3 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40"
         >
-          {exporting && exportType === "financial" ? "Generating…" : "Export Financial Statements"}
+          {exporting && exportType === "financial" ? "Generating..." : "Export Financial Statements"}
         </button>
         <button
           onClick={() => handleExport(true)}
           disabled={exporting}
           className="rounded bg-ink px-6 py-3 text-sm font-medium text-white hover:opacity-90 disabled:opacity-40"
         >
-          {exporting && exportType === "withTransactions" ? "Generating…" : "Export Financial Statements + Transactions"}
+          {exporting && exportType === "withTransactions" ? "Generating..." : "Export Financial Statements + Transactions"}
         </button>
         <button onClick={onNewWorkflow} className="rounded border border-line px-4 py-3 text-sm hover:bg-paper">
-          + New workflow
+          New workflow
         </button>
       </div>
     </div>

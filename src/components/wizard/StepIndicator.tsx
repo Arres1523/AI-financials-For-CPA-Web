@@ -5,31 +5,35 @@ type Step = { id: number; label: string; status: "active" | "completed" | "pendi
 
 export default function StepIndicator({ steps }: { steps: Step[] }) {
   return (
-    <nav aria-label="Workflow progress" className="mb-8">
-      <ol className="flex flex-wrap items-center gap-2 text-sm">
-        {steps.map((step, i) => (
-          <li key={step.id} className="flex items-center gap-2">
+    <nav aria-label="Workflow progress" className="mb-4">
+      <ol className="grid gap-px text-xs md:grid-cols-6">
+        {steps.map((step) => (
+          <li
+            key={step.id}
+            className={`flex min-h-11 items-center gap-2 border border-line px-3 py-2 ${
+              step.status === "active" ? "bg-sage text-black" : step.status === "completed" ? "bg-sage/10" : "bg-white"
+            }`}
+          >
             <span
-              className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold ${
+              className={`inline-flex h-5 min-w-5 items-center justify-center border text-[11px] font-bold ${
                 step.status === "completed"
-                  ? "bg-sage text-white"
+                  ? "border-sage bg-sage text-black"
                   : step.status === "active"
-                  ? "bg-ink text-white ring-2 ring-offset-2 ring-ink"
+                  ? "border-black bg-black text-white"
                   : step.status === "warning"
-                  ? "bg-brass text-white"
-                  : "bg-line text-slate-500"
+                  ? "border-brass bg-brass text-black"
+                  : "border-line bg-line text-slate-500"
               }`}
             >
-              {step.status === "completed" ? "✓" : step.id}
+              {step.status === "completed" ? "OK" : step.id}
             </span>
             <span
               className={`${
-                step.status === "active" ? "font-semibold text-ink" : step.status === "completed" ? "text-sage" : "text-slate-400"
+                step.status === "active" ? "font-semibold text-black" : step.status === "completed" ? "text-sage" : "text-slate-400"
               }`}
             >
               {step.label}
             </span>
-            {i < steps.length - 1 && <span className="text-line mx-1">—</span>}
           </li>
         ))}
       </ol>

@@ -28,7 +28,7 @@ function CategorySelect({ currentCategory, onChange }: { currentCategory: string
     >
       {!isKnown && currentCategory && (
         <option value="__unknown__" disabled>
-          {currentCategory} (unknown — select one)
+          {currentCategory} (unknown. Select one)
         </option>
       )}
       <optgroup label="P&L">
@@ -112,7 +112,7 @@ export default function ReviewStep({ workspace, onComplete, onBack }: Props) {
   const pendingCount = itemsNeedingReview.length;
   const allResolved = itemsNeedingReview.length === 0;
 
-  if (loading) return <p className="text-sm text-slate-500">Loading transactions…</p>;
+  if (loading) return <p className="text-sm text-slate-500">Loading transactions...</p>;
 
   return (
     <div className="space-y-4">
@@ -136,7 +136,7 @@ export default function ReviewStep({ workspace, onComplete, onBack }: Props) {
 
       {allResolved ? (
         <div className="rounded border border-sage/30 bg-sage/5 p-6 text-center">
-          <p className="text-sage font-medium">No exceptions — all transactions are classified.</p>
+          <p className="text-sage font-medium">No exceptions. All transactions are classified.</p>
           <p className="mt-1 text-sm text-slate-500">You can proceed to results.</p>
         </div>
       ) : (
@@ -144,7 +144,7 @@ export default function ReviewStep({ workspace, onComplete, onBack }: Props) {
           <div className="flex flex-wrap items-center gap-3">
             <input
               className="flex-1 min-w-[200px] rounded border border-line px-3 py-2 text-sm"
-              placeholder="Search description or category…"
+              placeholder="Search description or category"
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
             />
@@ -209,11 +209,11 @@ export default function ReviewStep({ workspace, onComplete, onBack }: Props) {
                         <span className={`text-xs font-medium ${
                           c?.confidence === "high" ? "text-sage" : c?.confidence === "medium" ? "text-brass" : "text-red-600"
                         }`}>
-                          {c?.confidence ?? "—"}
+                          {c?.confidence ?? "Pending"}
                         </span>
                       </td>
                       <td className="px-3 py-2 text-xs text-slate-500 max-w-[200px] truncate" title={c?.ruleUsed ?? ""}>
-                        {c?.ruleUsed ?? "—"}
+                        {c?.ruleUsed ?? "Pending"}
                       </td>
                       <td className="px-3 py-2">
                         {c?.reviewStatus && c.reviewStatus !== "approved" && c.reviewStatus !== "excluded" ? (
@@ -224,7 +224,7 @@ export default function ReviewStep({ workspace, onComplete, onBack }: Props) {
                              "Pending"}
                           </span>
                         ) : (
-                          <span className="text-xs text-slate-400">—</span>
+                          <span className="text-xs text-slate-400">Approved</span>
                         )}
                       </td>
                       <td className="px-3 py-2">
@@ -233,13 +233,13 @@ export default function ReviewStep({ workspace, onComplete, onBack }: Props) {
                             onClick={() => handleAction("approve", [t.id])}
                             className="rounded bg-sage/10 px-2 py-1 text-xs text-sage"
                           >
-                            ✓
+                            Approve
                           </button>
                           <button
                             onClick={() => handleAction("exclude", [t.id])}
                             className="rounded border border-line px-2 py-1 text-xs text-slate-500"
                           >
-                            ✕
+                            Exclude
                           </button>
                         </div>
                       </td>
@@ -256,7 +256,7 @@ export default function ReviewStep({ workspace, onComplete, onBack }: Props) {
 
       <div className="flex justify-between border-t border-line pt-4">
         {onBack && (
-          <button onClick={onBack} className="rounded border border-line px-4 py-2 text-sm">← Back</button>
+          <button onClick={onBack} className="rounded border border-line px-4 py-2 text-sm">Back</button>
         )}
         <button onClick={onComplete} className="rounded bg-ink px-6 py-2.5 text-sm text-white">
           Continue to Reconciliation

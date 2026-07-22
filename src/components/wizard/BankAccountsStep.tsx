@@ -80,10 +80,10 @@ export default function BankAccountsStep({ company, onComplete }: Props) {
             <div>
               <p className="font-medium">{a.accountName}</p>
               <p className="text-xs text-slate-500">
-                {a.bankName} •••• {a.lastFour} · {a.accountType}
+                {a.bankName} ending {a.lastFour}. {a.accountType}
               </p>
               <p className="text-xs text-slate-400">
-                Op: ${a.openingBalance?.toLocaleString() ?? "0"} · Cl: ${a.closingBalance?.toLocaleString() ?? "0"}
+                Opening: ${a.openingBalance?.toLocaleString() ?? "0"}. Closing: ${a.closingBalance?.toLocaleString() ?? "0"}
               </p>
             </div>
             <div className="flex gap-2">
@@ -140,7 +140,7 @@ export default function BankAccountsStep({ company, onComplete }: Props) {
         </div>
       ) : (
         <button onClick={() => setShowForm(true)} className="rounded border border-dashed border-line px-4 py-2 text-sm text-sage hover:bg-paper">
-          + Add bank account
+          Add bank account
         </button>
       )}
 

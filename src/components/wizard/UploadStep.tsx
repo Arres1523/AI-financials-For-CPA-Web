@@ -113,7 +113,7 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
     }
 
     const buffer = fileBuffersRef.current.get(preview.fileName);
-    if (!buffer) { setFileError("File buffer expired — please re-upload"); return; }
+    if (!buffer) { setFileError("File buffer expired. Please re-upload."); return; }
     return true;
   }
 
@@ -126,7 +126,7 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
 
     const formData = buildImportFormData(preview);
     if (!formData) {
-      setFileError("File buffer expired — please re-upload");
+      setFileError("File buffer expired. Please re-upload.");
       setPreclassifying(false);
       return;
     }
@@ -163,7 +163,7 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
 
     const formData = buildImportFormData(preview, overrides);
     if (!formData) {
-      setFileError("File buffer expired — please re-upload");
+      setFileError("File buffer expired. Please re-upload.");
       setUploading(false);
       return;
     }
@@ -244,9 +244,9 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
           value={selectedAccount}
           onChange={(e) => setSelectedAccount(e.target.value)}
         >
-          <option value="">— Select account —</option>
+          <option value="">Select account</option>
           {accounts.map((a) => (
-            <option key={a.id} value={a.id}>{a.accountName} ({a.bankName} ••••{a.lastFour})</option>
+            <option key={a.id} value={a.id}>{a.accountName} ({a.bankName} ending {a.lastFour})</option>
           ))}
         </select>
       </label>}
@@ -266,7 +266,7 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
       {/* Loading persisted statements */}
       {statementsLoading && (
         <div className="rounded border border-line p-4 text-center text-sm text-slate-500">
-          Loading previously imported statements…
+          Loading previously imported statements...
         </div>
       )}
 
@@ -284,7 +284,7 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
           <ul className="mt-2 space-y-1">
             {persistedStatements.map((s) => (
               <li key={s.id} className="text-sm text-slate-600">
-                {s.fileName} — {s.importedRows} transaction{s.importedRows !== 1 ? "s" : ""}
+                {s.fileName}: {s.importedRows} transaction{s.importedRows !== 1 ? "s" : ""}
               </li>
             ))}
           </ul>
@@ -294,24 +294,24 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
       {/* Error banner */}
       {fileError && (
         <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">
-          <p className="font-medium">⚠ {fileError}</p>
+          <p className="font-medium">{fileError}</p>
         </div>
       )}
 
       {/* Import status banners */}
       {importStatus === "success" && (
         <div className="rounded border border-sage/30 bg-sage/10 p-4 text-sm text-sage" role="status">
-          <p className="font-medium">✓ Import successful — {totalImported} transactions loaded</p>
+          <p className="font-medium">Import successful: {totalImported} transactions loaded</p>
         </div>
       )}
       {importStatus === "partial" && (
         <div className="rounded border border-brass/30 bg-brass/10 p-4 text-sm text-brass" role="alert">
-          <p className="font-medium">⚠ Imported with warnings — review details below</p>
+          <p className="font-medium">Imported with warnings. Review details below.</p>
         </div>
       )}
       {importStatus === "error" && (
         <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">
-          <p className="font-medium">✕ Import failed — see error above and try again</p>
+          <p className="font-medium">Import failed. See error above and try again.</p>
         </div>
       )}
 
@@ -322,9 +322,9 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
             <div>
               <p className="font-medium">{preview.fileName}</p>
               <p className="text-xs text-slate-500">
-                {preview.sheetName && `Sheet: ${preview.sheetName} · `}
+                {preview.sheetName && `Sheet: ${preview.sheetName}. `}
                 {preview.totalRows} rows
-                {preview.confidence === "high" ? " · Auto-detected ✓" : preview.confidence === "medium" ? " · Partial detection" : " · Needs mapping"}
+                {preview.confidence === "high" ? ". Auto-detected" : preview.confidence === "medium" ? ". Partial detection" : ". Needs mapping"}
               </p>
             </div>
             <button
@@ -335,7 +335,7 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
               {preclassifying ? (
                 <span className="flex items-center gap-2">
                   <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  Pre-classifying…
+                  Pre-classifying...
                 </span>
               ) : (
                 "Pre-classify"
@@ -345,7 +345,7 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
 
           {preview.errors.length > 0 && (
             <div className="rounded bg-red-50 p-3 text-sm text-red-700">
-              {preview.errors.map((err: string, i: number) => <p key={i}>⚠ {err}</p>)}
+              {preview.errors.map((err: string, i: number) => <p key={i}>{err}</p>)}
             </div>
           )}
 
@@ -384,13 +384,13 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
       {results.length > 0 && (
         <div className="rounded border border-sage/30 bg-sage/5 p-4">
           <p className="text-sm font-medium text-sage">
-            ✓ Imported {totalImported} transaction{totalImported !== 1 ? "s" : ""} from {results.length} file{results.length !== 1 ? "s" : ""}
+            Imported {totalImported} transaction{totalImported !== 1 ? "s" : ""} from {results.length} file{results.length !== 1 ? "s" : ""}
             {totalErrors > 0 && (
-              <span className="text-brass"> — {totalErrors} warning{totalErrors !== 1 ? "s" : ""}</span>
+              <span className="text-brass">. {totalErrors} warning{totalErrors !== 1 ? "s" : ""}</span>
             )}
           </p>
           {results.flatMap((r) => r.errors as ImportError[]).map((err: ImportError, i: number) => (
-            <p key={i} className="text-xs text-brass mt-1">⚠ Row {err.row}: {err.message}</p>
+            <p key={i} className="text-xs text-brass mt-1">Row {err.row}: {err.message}</p>
           ))}
         </div>
       )}

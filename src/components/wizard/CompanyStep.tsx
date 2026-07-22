@@ -87,7 +87,7 @@ export default function CompanyStep({ onComplete }: Props) {
           onClick={() => { setStep("search"); setSelectedCompany(null); setSelectedWorkspace(null); }}
           className="rounded border border-line px-3 py-1.5 text-sm hover:bg-paper"
         >
-          ← All companies
+          All companies
         </button>
         <h2 className="text-xl font-semibold">Company & Fiscal Year</h2>
       </div>
@@ -96,7 +96,7 @@ export default function CompanyStep({ onComplete }: Props) {
         <div className="space-y-4">
           <input
             className="w-full rounded border border-line px-4 py-2.5 text-sm"
-            placeholder="Search existing companies…"
+            placeholder="Search existing companies"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             autoFocus
@@ -158,7 +158,7 @@ export default function CompanyStep({ onComplete }: Props) {
           </div>
           <div className="flex gap-3">
             <button onClick={() => setStep("select-year")} className="rounded border border-line px-4 py-2 text-sm hover:bg-paper">
-              + New fiscal year
+              New fiscal year
             </button>
             <button
               onClick={createOrSelectWorkspace}

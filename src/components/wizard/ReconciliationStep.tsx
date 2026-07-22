@@ -97,7 +97,7 @@ export default function ReconciliationStep({ workspace, accounts, onComplete, on
     setSaving(false);
   }
 
-  if (loading) return <p className="text-sm text-slate-500">Loading reconciliation data…</p>;
+  if (loading) return <p className="text-sm text-slate-500">Loading reconciliation data...</p>;
 
   return (
     <div className="space-y-6">
@@ -105,14 +105,14 @@ export default function ReconciliationStep({ workspace, accounts, onComplete, on
 
       {hasNoBalances && (
         <div className="rounded border border-brass/30 bg-brass/5 p-4 text-sm text-brass">
-          ⚠ Some accounts have opening/closing balances of $0.00. Update account balances for accurate reconciliation.
+          Some accounts have opening/closing balances of $0.00. Update account balances for accurate reconciliation.
         </div>
       )}
 
       {hasUnreconciled && (
         <div className="rounded border border-red-200 bg-red-50 p-4 space-y-1 text-sm text-red-700">
-          <p className="font-medium">⚠ One or more accounts could not be reconciled</p>
-          <p>These reports are PRELIMINARY — generated solely from uploaded bank statement data.</p>
+          <p className="font-medium">One or more accounts could not be reconciled</p>
+          <p>These reports are preliminary and generated solely from uploaded bank statement data.</p>
           <p>The Balance Sheet may be incomplete. This does not substitute a professional CPA review.</p>
         </div>
       )}
@@ -143,7 +143,7 @@ export default function ReconciliationStep({ workspace, accounts, onComplete, on
                 </td>
                 <td className="px-3 py-2">
                   <span className={`text-xs font-medium ${r.status === "reconciled" ? "text-sage" : "text-red-600"}`}>
-                    {r.status === "reconciled" ? "✓ Reconciled" : "✕ Unreconciled"}
+                    {r.status === "reconciled" ? "Reconciled" : "Unreconciled"}
                   </span>
                 </td>
               </tr>
@@ -183,12 +183,12 @@ export default function ReconciliationStep({ workspace, accounts, onComplete, on
                         onChange={e => updateEntry(globalIndex, "amount", parseFloat(e.target.value) || 0)}
                         className="w-28 rounded border border-line p-2 text-sm"
                       />
-                      <button onClick={() => removeEntry(globalIndex)} className="text-xs text-red-500">✕</button>
+                      <button onClick={() => removeEntry(globalIndex)} className="text-xs text-red-500">Remove</button>
                     </div>
                   );
                 })}
               </div>
-              <button onClick={() => addEntry(type)} className="mt-1 text-xs text-slate-500 hover:text-ink">+ Add {type}</button>
+              <button onClick={() => addEntry(type)} className="mt-1 text-xs text-slate-500 hover:text-ink">Add {type}</button>
             </div>
           );
         })}
@@ -204,7 +204,7 @@ export default function ReconciliationStep({ workspace, accounts, onComplete, on
               ${totals.diff.toFixed(2)}
             </span>
             {totals.isValid ? (
-              <span className="ml-2 text-xs text-sage">✓ Balanced</span>
+              <span className="ml-2 text-xs text-sage">Balanced</span>
             ) : (
               <span className="ml-2 text-xs text-red-600">Does not balance</span>
             )}
@@ -220,11 +220,11 @@ export default function ReconciliationStep({ workspace, accounts, onComplete, on
       </div>
 
       <div className="rounded border border-brass/30 bg-brass/5 p-4 text-sm text-brass space-y-1">
-        <p className="font-medium">⚠ Important accounting notice</p>
+        <p className="font-medium">Important accounting notice</p>
         <ul className="list-disc list-inside space-y-0.5">
           <li>These financial statements are <strong>preliminary</strong>.</li>
           <li>They are generated solely from the uploaded bank statement data.</li>
-          <li>The Balance Sheet may be incomplete — we never invent missing assets, liabilities, or equity.</li>
+          <li>The Balance Sheet may be incomplete. Missing assets, liabilities, or equity are not invented.</li>
           <li>If the Balance Sheet does not balance, the actual difference is shown (not adjusted).</li>
           <li>This report does not substitute a review by a qualified CPA.</li>
           <li>Do not use for tax filing or financial decisions without professional verification.</li>
@@ -233,7 +233,7 @@ export default function ReconciliationStep({ workspace, accounts, onComplete, on
 
       <div className="flex justify-between border-t border-line pt-4">
         {onBack && (
-          <button onClick={onBack} className="rounded border border-line px-4 py-2 text-sm">← Back</button>
+          <button onClick={onBack} className="rounded border border-line px-4 py-2 text-sm">Back</button>
         )}
         <button onClick={() => onComplete(results)} className="rounded bg-ink px-6 py-2.5 text-sm text-white">
           Continue to Results

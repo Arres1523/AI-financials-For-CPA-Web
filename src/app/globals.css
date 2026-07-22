@@ -3,8 +3,19 @@
 @tailwind utilities;
 
 :root {
-  color: #17212b;
-  background: #f7f8fa;
+  color: #ffffff;
+  background: #000000;
+  --surface: #111111;
+  --surface-2: #18181b;
+  --line: #27272a;
+  --line-strong: #3f3f46;
+  --text: #ffffff;
+  --muted: #a1a1aa;
+  --dim: #71717a;
+  --accent: #ffd60a;
+  --warning: #ffb800;
+  --danger: #ef4444;
+  --success: #ffd60a;
 }
 
 * {
@@ -13,7 +24,10 @@
 
 body {
   margin: 0;
-  font-family: Arial, Helvetica, sans-serif;
+  background: #000000;
+  color: var(--text);
+  font-family: "IBM Plex Mono", "JetBrains Mono", "Berkeley Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-variant-numeric: tabular-nums;
 }
 
 button,
@@ -21,6 +35,180 @@ input,
 textarea,
 select {
   font: inherit;
+}
+
+button,
+input,
+textarea,
+select,
+a {
+  transition-duration: 150ms;
+  transition-property: background-color, border-color, color, opacity;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+a:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+input,
+textarea,
+select {
+  background: var(--surface) !important;
+  border-color: var(--line-strong) !important;
+  color: var(--text) !important;
+  box-shadow: none !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted) !important;
+  opacity: 1;
+}
+
+option,
+optgroup {
+  background: #111111;
+  color: #ffffff;
+}
+
+table {
+  border-color: var(--line);
+}
+
+th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.rounded,
+.rounded-sm,
+.rounded-md,
+.rounded-lg,
+.rounded-xl,
+.rounded-2xl,
+.rounded-3xl,
+.rounded-full {
+  border-radius: 0 !important;
+}
+
+.shadow,
+.shadow-sm,
+.shadow-md,
+.shadow-lg,
+.shadow-xl,
+.shadow-2xl {
+  box-shadow: none !important;
+}
+
+.bg-paper,
+.bg-black {
+  background-color: #000000 !important;
+}
+
+.bg-white,
+.bg-slate-50 {
+  background-color: var(--surface) !important;
+}
+
+.bg-ink,
+.bg-sage {
+  background-color: var(--accent) !important;
+}
+
+.bg-line {
+  background-color: var(--line) !important;
+}
+
+.bg-brass,
+.bg-brass\/5,
+.bg-brass\/10 {
+  background-color: rgba(255, 184, 0, 0.12) !important;
+}
+
+.bg-red-50,
+.bg-red-100 {
+  background-color: rgba(239, 68, 68, 0.12) !important;
+}
+
+.bg-sage\/5,
+.bg-sage\/10 {
+  background-color: rgba(255, 214, 10, 0.1) !important;
+}
+
+.border-line,
+.border-slate-200,
+.border-red-200 {
+  border-color: var(--line) !important;
+}
+
+.border-ink,
+.border-sage,
+.border-sage\/30 {
+  border-color: var(--accent) !important;
+}
+
+.border-brass\/30 {
+  border-color: rgba(255, 184, 0, 0.45) !important;
+}
+
+.text-ink,
+.text-white {
+  color: var(--text) !important;
+}
+
+.text-sage,
+.text-brass,
+.text-amber-700 {
+  color: var(--accent) !important;
+}
+
+.text-slate-400,
+.text-slate-500,
+.text-slate-600,
+.text-zinc-400,
+.text-\[\#A1A1AA\] {
+  color: var(--muted) !important;
+}
+
+.text-red-600,
+.text-red-700,
+.text-\[\#EF4444\] {
+  color: var(--danger) !important;
+}
+
+.bg-ink.text-white,
+.bg-sage.text-white,
+.bg-ink .text-white,
+.bg-sage .text-white {
+  color: #000000 !important;
+}
+
+.ring-ink {
+  --tw-ring-color: var(--accent) !important;
+}
+
+.ring-offset-2 {
+  --tw-ring-offset-color: #000000 !important;
+}
+
+.hover\:bg-paper:hover,
+.hover\:bg-slate-50:hover {
+  background-color: var(--surface-2) !important;
+}
+
+.hover\:text-ink:hover {
+  color: var(--text) !important;
+}
+
+.disabled\:opacity-40:disabled,
+.disabled\:opacity-50:disabled,
+.disabled\:opacity-60:disabled {
+  opacity: 0.45 !important;
 }
 
 .money {

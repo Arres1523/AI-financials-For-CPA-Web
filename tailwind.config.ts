@@ -5,11 +5,11 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: "#17212b",
-        paper: "#f7f8fa",
-        line: "#d8dde5",
-        sage: "#5d7668",
-        brass: "#9a7b2f"
+        ink: "#FFFFFF",
+        paper: "#000000",
+        line: "#27272A",
+        sage: "#FFD60A",
+        brass: "#FFB800"
       }
     }
   },

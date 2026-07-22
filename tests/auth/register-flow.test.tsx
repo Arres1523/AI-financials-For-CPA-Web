@@ -44,7 +44,7 @@ describe("RegisterForm", () => {
     expect((screen.getByRole("button", { name: /creating account/i }) as HTMLButtonElement).disabled).toBe(true);
 
     await waitFor(() => {
-      expect(screen.getByRole("alert").textContent).toContain("Account creation failed");
+      expect(screen.getByRole("alert").textContent).toContain("network failed");
       expect((screen.getByRole("button", { name: /create account/i }) as HTMLButtonElement).disabled).toBe(false);
     });
   });

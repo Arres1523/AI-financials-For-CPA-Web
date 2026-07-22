@@ -5,6 +5,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  return "Check your connection and Supabase Auth settings, then try again.";
+}
+
 export default function RegisterForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -42,8 +47,8 @@ export default function RegisterForm() {
       }
 
       setSuccess(true);
-    } catch {
-      setError("Account creation failed. Check your connection and Supabase Auth settings, then try again.");
+    } catch (error) {
+      setError(`Account creation failed: ${getErrorMessage(error)}`);
     } finally {
       setIsSubmitting(false);
     }

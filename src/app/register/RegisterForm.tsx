@@ -2,9 +2,11 @@
 
 import React from "react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 
 export default function RegisterForm() {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
@@ -17,24 +19,34 @@ export default function RegisterForm() {
     setIsSubmitting(true);
     setError(null);
 
-    const supabase = createClient();
-    const { error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName },
-        emailRedirectTo: `${location.origin}/auth/callback`,
-      },
-    });
+    try {
+      const supabase = createClient();
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: { full_name: fullName.trim() },
+          emailRedirectTo: `${location.origin}/auth/callback`,
+        },
+      });
 
-    if (signUpError) {
-      setError(signUpError.message);
+      if (signUpError) {
+        setError(signUpError.message);
+        return;
+      }
+
+      if (data.session) {
+        router.replace("/");
+        router.refresh();
+        return;
+      }
+
+      setSuccess(true);
+    } catch {
+      setError("Account creation failed. Check your connection and Supabase Auth settings, then try again.");
+    } finally {
       setIsSubmitting(false);
-      return;
     }
-
-    setSuccess(true);
-    setIsSubmitting(false);
   }
 
   if (success) {

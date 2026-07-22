@@ -1,11 +1,19 @@
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
 import fs from "fs";
 import path from "path";
+import * as XLSX from "xlsx";
 
 const BASE = "http://localhost:3001";
 
 function readFixture(name: string): Buffer {
   return fs.readFileSync(path.join(__dirname, "../fixtures", name));
+}
+
+function makeWorkbook(rows: Record<string, string>[]): Buffer {
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Sheet1");
+  return Buffer.from(XLSX.write(wb, { type: "buffer", bookType: "xlsx" }));
 }
 
 async function json(method: string, url: string, body?: unknown) {
@@ -154,6 +162,103 @@ describe("Import domain logic", () => {
 });
 
 describe("Classification after import", () => {
+  it("preclassifies mapped rows without persisting them", async () => {
+    const { preclassifyImportRows } = await import("../../src/domain/importPreclassification");
+    const buf = readFixture("chase_sample.xlsx");
+
+    const result = preclassifyImportRows(
+      buf,
+      "chase_sample.xlsx",
+      { date: "Date", description: "Description", amount: "Amount", balance: "Balance" },
+      "ws-test",
+      "ba-test",
+      2026
+    );
+
+    expect(result.rows).toHaveLength(8);
+    expect(result.summary).toEqual({
+      totalRows: 8,
+      validRows: 8,
+      needsReview: 2,
+      highConfidence: 7,
+    });
+    expect(result.rows[0]).toMatchObject({
+      rowIndex: 0,
+      date: "2026-01-05",
+      description: "Rental income January",
+      amount: 12000,
+      proposedClassification: {
+        finalCategory: "Rental Income",
+        reportType: "P&L",
+        confidence: "high",
+      },
+    });
+    expect(result.errors).toEqual([]);
+  });
+
+  it("uses classification text when payee and memo are mapped separately", async () => {
+    const { preclassifyImportRows } = await import("../../src/domain/importPreclassification");
+    const buf = makeWorkbook([
+      { Date: "01/15/2026", Payee: "Wyndham Investment Group LLC", Memo: "Monthly rent", Amount: "1200.00" },
+    ]);
+
+    const result = preclassifyImportRows(
+      buf,
+      "payee_memo_sample.xlsx",
+      { date: "Date", payee: "Payee", description: "Memo", amount: "Amount" },
+      "ws-test",
+      "ba-test",
+      2026
+    );
+
+    expect(result.rows[0].description).toBe("Monthly rent");
+    expect(result.rows[0].classificationText).toBe("Wyndham Investment Group LLC | Monthly rent");
+    expect(result.rows[0].proposedClassification.finalCategory).toBe("Operating / merchant income");
+  });
+
+  it("maps global model categories into CPA categories when confidence is usable", async () => {
+    const { mapGlobalCategoryToClassification } = await import("../../src/domain/globalTransactionClassifier");
+
+    expect(mapGlobalCategoryToClassification("Utilities & Services", 0.92, "tx-1")).toMatchObject({
+      finalCategory: "Utilities",
+      reportType: "P&L",
+      confidence: "medium",
+      reviewStatus: "pending",
+      ruleUsed: "Global classifier — Utilities & Services",
+    });
+    expect(mapGlobalCategoryToClassification("Food & Dining", 0.92, "tx-2")).toBeNull();
+    expect(mapGlobalCategoryToClassification("Income", 0.61, "tx-3")).toBeNull();
+  });
+
+  it("applies preclassification overrides before persistence", async () => {
+    const { applyPreclassificationOverride } = await import("../../src/domain/importPreclassification");
+    const { classifyTransaction } = await import("../../src/domain/classification");
+    const base = classifyTransaction({
+      id: "tx-1",
+      workspaceId: "ws-test",
+      bankAccountId: "ba-test",
+      statementId: "st-test",
+      date: "2026-01-01",
+      description: "Unknown payment",
+      amount: -100,
+      balance: null,
+      originalRowIndex: 0,
+      createdAt: "",
+    });
+
+    expect(applyPreclassificationOverride(base, { rowIndex: 0, finalCategory: "Utilities" })).toMatchObject({
+      finalCategory: "Utilities",
+      reportType: "P&L",
+      reviewStatus: "approved",
+      isManualCorrection: true,
+    });
+    expect(applyPreclassificationOverride(base, { rowIndex: 0, excluded: true })).toMatchObject({
+      finalCategory: base.finalCategory,
+      reviewStatus: "excluded",
+      isManualCorrection: true,
+    });
+  });
+
   it("classifies imported transactions correctly", async () => {
     const { classifyTransaction } = await import("../../src/domain/classification");
     const { importRows } = await import("../../src/domain/importXlsx");

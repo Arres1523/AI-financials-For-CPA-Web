@@ -123,6 +123,37 @@ export type XlsxImportRow = {
   sheetName?: string;
 };
 
+export type GlobalClassifierSuggestion = {
+  category: string;
+  confidence: number;
+  source: "huggingface" | "local_rules";
+};
+
+export type PreclassifiedImportRow = XlsxImportRow & {
+  proposedClassification: Classification;
+  globalSuggestion?: GlobalClassifierSuggestion | null;
+};
+
+export type PreclassificationSummary = {
+  totalRows: number;
+  validRows: number;
+  needsReview: number;
+  highConfidence: number;
+};
+
+export type PreclassificationResult = {
+  rows: PreclassifiedImportRow[];
+  errors: ImportError[];
+  summary: PreclassificationSummary;
+};
+
+export type PreclassificationOverride = {
+  rowIndex: number;
+  finalCategory?: string;
+  reviewStatus?: ReviewStatus;
+  excluded?: boolean;
+};
+
 export type ReconciliationResult = {
   accountId: string;
   accountName: string;

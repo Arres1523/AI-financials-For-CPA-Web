@@ -24,7 +24,7 @@ export default function Wizard() {
     { id: 1 as StepId, label: "Company & Year" },
     { id: 2 as StepId, label: "Bank Accounts" },
     { id: 3 as StepId, label: "Upload Statements" },
-    { id: 4 as StepId, label: "Review Exceptions" },
+    { id: 4 as StepId, label: "Resolve Exceptions" },
     { id: 5 as StepId, label: "Reconciliation" },
     { id: 6 as StepId, label: "Results & Export" },
   ];

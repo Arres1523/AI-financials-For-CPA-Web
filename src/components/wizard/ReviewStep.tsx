@@ -117,7 +117,7 @@ export default function ReviewStep({ workspace, onComplete, onBack }: Props) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-semibold">Review Exceptions</h2>
+        <h2 className="text-xl font-semibold">Resolve Exceptions</h2>
         <div className="flex gap-2">
           <button
             onClick={() => setActiveTab("exceptions")}

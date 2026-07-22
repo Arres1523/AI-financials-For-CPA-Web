@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { query, queryOne, withTransaction } from "@/lib/db";
 import { v4 as uuid } from "uuid";
 import { importRows, hashFile } from "@/domain/importXlsx";
-import type { ColumnMapping } from "@/domain/types";
+import type { ColumnMapping, PreclassificationOverride } from "@/domain/types";
 import { classifyTransaction } from "@/domain/classification";
+import { applyPreclassificationOverride } from "@/domain/importPreclassification";
 import { z } from "zod";
 import { requireUser, UnauthorizedError } from "@/lib/require-user";
 
@@ -37,10 +38,22 @@ export async function POST(request: Request) {
     const bankAccountId = formData.get("bankAccountId") as string;
     const taxYear = parseInt(formData.get("taxYear") as string);
     const mappingJson = formData.get("mapping") as string;
+    const overridesJson = formData.get("overrides") as string | null;
 
     if (!file || !workspaceId || !bankAccountId || !taxYear) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
+
+    let overrides: PreclassificationOverride[] = [];
+    if (overridesJson) {
+      try {
+        const parsed = JSON.parse(overridesJson);
+        overrides = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return NextResponse.json({ error: "Invalid overrides JSON" }, { status: 400 });
+      }
+    }
+    const overridesByRow = new Map(overrides.map((override) => [override.rowIndex, override]));
 
     let mapping: ColumnMapping;
     try {
@@ -90,7 +103,7 @@ export async function POST(request: Request) {
           "INSERT INTO transactions (id, workspace_id, bank_account_id, statement_id, date, description, amount, balance, original_row_index, user_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
           [txId, workspaceId, bankAccountId, statementId, row.date, row.description, row.amount, row.balance, row.rowIndex, user.id]
         );
-        const classification = classifyTransaction({
+        const classification = applyPreclassificationOverride(classifyTransaction({
           id: txId,
           workspaceId,
           bankAccountId,
@@ -101,10 +114,10 @@ export async function POST(request: Request) {
           balance: row.balance,
           originalRowIndex: row.rowIndex,
           createdAt: new Date().toISOString(),
-        });
+        }), overridesByRow.get(row.rowIndex));
         await client.query(
-          "INSERT INTO classifications (id, transaction_id, final_category, report_type, confidence, rule_used, review_status, user_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-          [classification.id, txId, classification.finalCategory, classification.reportType, classification.confidence, classification.ruleUsed, classification.reviewStatus, user.id]
+          "INSERT INTO classifications (id, transaction_id, final_category, report_type, confidence, rule_used, review_status, is_manual_correction, user_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+          [classification.id, txId, classification.finalCategory, classification.reportType, classification.confidence, classification.ruleUsed, classification.reviewStatus, classification.isManualCorrection ? 1 : 0, user.id]
         );
         count++;
       }

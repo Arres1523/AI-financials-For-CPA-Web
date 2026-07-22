@@ -2,8 +2,19 @@
 import React from "react";
 
 import { useState, useRef, useEffect } from "react";
-import type { BankAccount, ColumnMapping, UploadPreview, ImportError, UploadedStatement, Workspace } from "@/domain/types";
+import type {
+  BankAccount,
+  ColumnMapping,
+  ImportError,
+  PreclassifiedImportRow,
+  PreclassificationOverride,
+  PreclassificationSummary,
+  UploadPreview,
+  UploadedStatement,
+  Workspace,
+} from "@/domain/types";
 import ColumnMapper from "./ColumnMapper";
+import PreclassificationReview from "./PreclassificationReview";
 
 type Props = {
   workspace: Workspace;
@@ -11,9 +22,19 @@ type Props = {
   onComplete: () => void;
 };
 
+type PreclassificationState = {
+  preview: UploadPreview;
+  rows: PreclassifiedImportRow[];
+  errors: ImportError[];
+  summary: PreclassificationSummary;
+  duplicateStatement?: boolean;
+};
+
 export default function UploadStep({ workspace, accounts, onComplete }: Props) {
   const [uploading, setUploading] = useState(false);
+  const [preclassifying, setPreclassifying] = useState(false);
   const [previews, setPreviews] = useState<UploadPreview[]>([]);
+  const [preclassification, setPreclassification] = useState<PreclassificationState | null>(null);
   const [mappings, setMappings] = useState<Record<string, ColumnMapping>>({});
   const [selectedAccount, setSelectedAccount] = useState("");
   const [results, setResults] = useState<{ imported: number; errors: ImportError[]; statementId: string }[]>([]);
@@ -66,7 +87,23 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
     setMappings((prev) => ({ ...prev, [fileName]: mapping }));
   }
 
-  async function doImport(preview: UploadPreview) {
+  function buildImportFormData(preview: UploadPreview, overrides?: PreclassificationOverride[]) {
+    const mapping = mappings[preview.fileName] || preview.detectedMapping as ColumnMapping;
+    const buffer = fileBuffersRef.current.get(preview.fileName);
+    if (!buffer) return null;
+
+    const formData = new FormData();
+    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    formData.append("file", blob, preview.fileName);
+    formData.append("workspaceId", workspace.id);
+    formData.append("bankAccountId", selectedAccount);
+    formData.append("taxYear", String(workspace.taxYear));
+    formData.append("mapping", JSON.stringify(mapping));
+    if (overrides) formData.append("overrides", JSON.stringify(overrides));
+    return formData;
+  }
+
+  function validateImportInputs(preview: UploadPreview) {
     if (!selectedAccount) { setFileError("Select a bank account first"); return; }
 
     const mapping = mappings[preview.fileName] || preview.detectedMapping as ColumnMapping;
@@ -77,23 +114,66 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
 
     const buffer = fileBuffersRef.current.get(preview.fileName);
     if (!buffer) { setFileError("File buffer expired — please re-upload"); return; }
+    return true;
+  }
+
+  async function doPreclassify(preview: UploadPreview) {
+    if (!validateImportInputs(preview)) return;
+
+    setPreclassifying(true);
+    setFileError("");
+    setPreclassification(null);
+
+    const formData = buildImportFormData(preview);
+    if (!formData) {
+      setFileError("File buffer expired — please re-upload");
+      setPreclassifying(false);
+      return;
+    }
+
+    const res = await fetch("/api/import/preclassify", { method: "POST", body: formData });
+    if (res.ok) {
+      const data = await res.json();
+      setPreclassification({
+        preview,
+        rows: data.rows,
+        errors: data.errors || [],
+        summary: data.summary,
+        duplicateStatement: data.duplicateStatement,
+      });
+      setImportStatus("idle");
+    } else {
+      let msg = "Pre-classification failed";
+      try {
+        const err = await res.json();
+        msg = err.error || msg;
+      } catch {}
+      setFileError(msg);
+      setImportStatus("error");
+    }
+
+    setPreclassifying(false);
+  }
+
+  async function doImport(preview: UploadPreview, overrides?: PreclassificationOverride[]) {
+    if (!validateImportInputs(preview)) return;
 
     setUploading(true);
     setFileError("");
 
-    const formData = new FormData();
-    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-    formData.append("file", blob, preview.fileName);
-    formData.append("workspaceId", workspace.id);
-    formData.append("bankAccountId", selectedAccount);
-    formData.append("taxYear", String(workspace.taxYear));
-    formData.append("mapping", JSON.stringify(mapping));
+    const formData = buildImportFormData(preview, overrides);
+    if (!formData) {
+      setFileError("File buffer expired — please re-upload");
+      setUploading(false);
+      return;
+    }
 
     const res = await fetch("/api/import", { method: "POST", body: formData });
     if (res.ok) {
       const data = await res.json();
       setResults((prev) => [...prev, data]);
       setPreviews((prev) => prev.filter((p) => p.fileName !== preview.fileName));
+      setPreclassification(null);
       setImportStatus(data.errors && data.errors.length > 0 ? "partial" : "success");
     } else {
       let msg = "Import failed";
@@ -144,7 +224,20 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
     <div className="space-y-6">
       <h2 className="text-xl font-semibold">Upload Bank Statements</h2>
 
-      <label className="grid gap-1 text-sm max-w-xs">
+      {preclassification && (
+        <PreclassificationReview
+          fileName={preclassification.preview.fileName}
+          rows={preclassification.rows}
+          errors={preclassification.errors}
+          summary={preclassification.summary}
+          duplicateStatement={preclassification.duplicateStatement}
+          confirming={uploading}
+          onBack={() => setPreclassification(null)}
+          onConfirm={(overrides) => doImport(preclassification.preview, overrides)}
+        />
+      )}
+
+      {!preclassification && <label className="grid gap-1 text-sm max-w-xs">
         Target bank account
         <select
           className="rounded border border-line px-3 py-2"
@@ -156,9 +249,9 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
             <option key={a.id} value={a.id}>{a.accountName} ({a.bankName} ••••{a.lastFour})</option>
           ))}
         </select>
-      </label>
+      </label>}
 
-      <div className="rounded border border-dashed border-line p-6 text-center">
+      {!preclassification && <div className="rounded border border-dashed border-line p-6 text-center">
         <input
           ref={fileRef}
           type="file"
@@ -168,7 +261,7 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
           className="block w-full text-sm file:mr-4 file:rounded file:border-0 file:bg-ink file:px-4 file:py-2 file:text-sm file:text-white hover:file:opacity-90"
         />
         <p className="mt-2 text-xs text-slate-400">Accepts .xlsx files only, multiple files allowed</p>
-      </div>
+      </div>}
 
       {/* Loading persisted statements */}
       {statementsLoading && (
@@ -223,7 +316,7 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
       )}
 
       {/* Preview cards for each uploaded file */}
-      {previews.map((preview) => (
+      {!preclassification && previews.map((preview) => (
         <div key={preview.fileName} className="rounded border border-line p-4 space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -235,17 +328,17 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
               </p>
             </div>
             <button
-              onClick={() => doImport(preview)}
-              disabled={uploading || previews.length === 0}
+              onClick={() => doPreclassify(preview)}
+              disabled={preclassifying || previews.length === 0}
               className="rounded bg-sage px-5 py-2 text-sm font-medium text-white disabled:opacity-40 hover:opacity-90"
             >
-              {uploading ? (
+              {preclassifying ? (
                 <span className="flex items-center gap-2">
                   <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  Importing…
+                  Pre-classifying…
                 </span>
               ) : (
-                "Import"
+                "Pre-classify"
               )}
             </button>
           </div>

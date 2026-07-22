@@ -40,11 +40,26 @@ tags:
             │
             ▼
 [6] Results & Export
-    ├── Resumen: statements, transacciones, pendientes, balance check
-    ├── Preview: P&L y Balance Sheet
-    ├── Exportar workbook XLSX (con o sin Transaction History)
+    ├── Resumen: statements, transacciones, pendientes, modo de reporte
+    ├── Alertas: cuentas no reconciliadas, clasificación incompleta, documentación pendiente, ecuación contable, suspenso
+    ├── Preview: P&L, Balance Sheet, Cash Rollforward
+    ├── Modos de reporte (automáticos):
+    │   ├── "classified_bank_activity" → sin BS apertura
+    │   ├── "preliminary_balance_sheet" → BS apertura presente pero hay issues
+    │   └── "complete_balance_sheet" → todo satisfecho
+    ├── Transfer Matching automático (excluye transfers internos del P&L/BS)
+    ├── Exportar workbook XLSX:
+    │   ├── P&L + BS + Cash Rollforward + Reconciliation + Report Status
+    │   └── Transaction History con 12 columnas de auditoría (opcional)
     └── Exportar CPA memo DOCX
 ```
+
+## Opening Balances (Step 5.5)
+
+Antes de llegar a Results, el usuario puede proveer saldos de apertura:
+- Se almacenan en `opening_balance_entries` (asset/liability/equity)
+- Se validan con `validateOpeningBalanceSheet()` (A - L = E ≈ 0)
+- Habilitan modos de reporte más completos
 
 ## Flujo de Datos en Importación
 
@@ -69,6 +84,11 @@ tags:
 ## 🔗 Enlaces Relacionados
 
 - [[Arquitectura]]
+- [[Financial Reporting]]
+- [[Transfer Matching]]
+- [[Suspense]]
+- [[Cash Rollforward]]
+- [[Opening Balances]]
 - [[Clasificación de Transacciones]]
 - [[Componentes UI]]
 - [[Errores Conocidos]]

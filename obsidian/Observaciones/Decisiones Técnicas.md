@@ -63,8 +63,52 @@ tags:
 **Por qué:** Protección legal y profesional para el CPA. Expectativas claras.
 **Trade-off:** Puede percibirse como limitación del producto.
 
+## 🆕 Reporting Redesign (2026-07-14)
+
+### Report Modes (3 niveles)
+**Decisión:** `classified_bank_activity` → `preliminary_balance_sheet` → `complete_balance_sheet`
+**Por qué:** Gradual disclosure. El CPA ve exactamente qué tan completo está el reporte basado en datos disponibles (opening balances, suspense, reconciliación, ecuación contable, clasificación).
+**Trade-off:** Complejidad adicional en la UI. El modo se determina automáticamente, no es configurable.
+
+### Transfer Matching Automático
+**Decisión:** Detectar transferencias internas por regex y matching (±3 días, ±1¢) y excluirlas del P&L/BS
+**Por qué:** Los transfers entre cuentas propias no son ingresos/gastos. Sin esto, el P&L muestra inflación artificial.
+**Trade-off:** Matching imperfecto — transfers con fechas muy distantes o montos exactos no se detectan. El regex puede tener falsos positivos.
+
+### Suspense como Gatekeeper
+**Decisión:** Las transacciones en suspenso (no aprobadas, no excluidas, o Uncategorized) bloquean el modo `complete_balance_sheet`
+**Por qué:** Un reporte "completo" debería tener todas las transacciones resueltas. El suspense es una señal de que falta review.
+**Trade-off:** El CPA puede tener razones legítimas para dejar items sin clasificar. El modo baja automáticamente.
+
+### Cash Rollforward Puro (Sin Plugs)
+**Decisión:** `openingCash + inflows - outflows = calculatedEnding`. Si hay diferencia, se muestra como variance. No se maquilla.
+**Por qué:** Muestra exactamente la verdad de los datos. El CPA decide si hay transacciones faltantes o errores.
+**Trade-off:** Variance puede ser confuso si el usuario espera que "siempre cuadre".
+
+### Opening Balances como Input Opcional
+**Decisión:** Los saldos de apertura (asset/liability/equity) se ingresan manualmente en ReconciliationStep y se validan con A - L = E ≈ 0
+**Por qué:** Habilitan modos de reporte más ricos (preliminary_balance_sheet, complete_balance_sheet) sin requerir contabilidad completa.
+**Trade-off:** Input manual propenso a errores. No hay integración con software contable.
+
+### Category Options como Single Source of Truth
+**Decisión:** Extraer la taxonomía de categorías de `classification.ts` a `categoryOptions.ts` con 25 categorías canónicas
+**Por qué:** Elimina duplicación entre frontend (ReviewStep select) y backend (classification rules). Centraliza report types.
+**Trade-off:** Cambiar la taxonomía requiere modificar código y tests.
+
+### Transaction History con 12 Columnas de Auditoría
+**Decisión:** Expandir Tx History de 4 a 12 columnas: Date, Description, Amount, Balance, Bank Account, Category, Report Type, Confidence, Rule Used, Classification Status, Documentation Status, Manual Correction, Review Notes
+**Por qué:** Los CPAs necesitan trazabilidad completa para preparar los estados financieros. Cada transacción debe explicarse.
+**Trade-off:** Archivos XLSX más grandes. La columna de notas de revisión requiere datos de review_events.
+
 ## 🔗 Enlaces Relacionados
 
 - [[Arquitectura]]
+- [[Financial Reporting]]
+- [[Transfer Matching]]
+- [[Suspense]]
+- [[Cash Rollforward]]
+- [[Opening Balances]]
+- [[Category Options]]
+- [[Workbook Export]]
 - [[Deuda Técnica]]
 - [[Features Pendientes]]

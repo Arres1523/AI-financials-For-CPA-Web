@@ -31,7 +31,8 @@ tags:
 | `/api/transactions` | GET | Listar transacciones con filtros (workspaceId, bankAccountId, reviewStatus, needsReview) |
 | `/api/classifications` | POST | Bulk approve/exclude/recategorize + log review_events |
 | `/api/statements` | GET | Listar statements subidos por workspace |
-| `/api/export/workbook` | POST | Generar y descargar XLSX (P&L, BS, opcional Tx History) |
+| `/api/opening-balances` | GET/POST | Obtener/guardar saldos de apertura (OpeningBalanceEntry[]) |
+| `/api/export/workbook` | POST | Generar y descargar XLSX (P&L, BS, Cash Rollforward, Reconciliation, Report Status, opcional Tx History 12 cols) |
 | `/api/export/memo` | POST | Generar y descargar CPA memo DOCX |
 
 ## Notas sobre las Rutas
@@ -46,4 +47,6 @@ tags:
 
 - [[Arquitectura]]
 - [[Flujo de Trabajo]]
+- [[Opening Balances]]
+- [[Workbook Export]]
 - [[Errores Conocidos]] — Problemas conocidos en API

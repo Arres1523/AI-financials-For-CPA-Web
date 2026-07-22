@@ -74,18 +74,27 @@ RootLayout (layout.tsx)
 - Tabla: Account, Opening, Movement, Expected Close, Closing, Variance, Status
 - Warnings para cuentas no reconciliadas y saldos $0
 - Disclaimer de reportes preliminares
+- **Opening Balances UI** — Formulario para proveer saldos de apertura (asset/liability/equity) que se guardan vía `/api/opening-balances`
 
 ### ResultsStep.tsx
-- Summary cards: statements, transactions, pending, balance check
+- Summary cards (8-grid): statements, transactions, pending review, report mode, reconciliation ratio, classification ratio, documentation ratio, equation check
+- **Alert banners**: unreconciled accounts, incomplete classification, pending documentation, accounting equation failures, suspense items (alertas individuales por check)
 - P&L preview: income lines, expense lines, net income
-- BS preview: assets, liabilities, equity, balance check
-- Reconciliation status per account
-- Botones de export: con/sin Transaction History
+- BS preview: assets, liabilities, equity, balance check (verde/rojo)
+- **Cash Rollforward preview**: openingCash, inflows, outflows, calculatedEnding, actualCash, variance
+- **Report Mode indicator**: Complete ✓ / Preliminary ⚠ / Bank Activity ℹ
+- **Matched Transfers count**: cuántas transferencias internas se matchearon y excluyeron
+- Botones de export: "Export Financial Statements" y "Export Financial Statements + Transactions"
 - "New workflow" button
 - Disclaimer cuando hay warnings
 
 ## 🔗 Enlaces Relacionados
 
 - [[Flujo de Trabajo]]
+- [[Financial Reporting]]
+- [[Transfer Matching]]
+- [[Suspense]]
+- [[Cash Rollforward]]
+- [[Opening Balances]]
 - [[Arquitectura]]
 - [[Optimizaciones]]

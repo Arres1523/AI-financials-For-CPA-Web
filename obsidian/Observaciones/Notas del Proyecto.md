@@ -14,9 +14,19 @@ tags:
 
 ## Historia del Proyecto
 
-1. **Fase 1 (MVP actual):** Next.js + PostgreSQL (Supabase). Migración desde `better-sqlite3` que fallaba en Vercel (SQLITE_READONLY).
+1. **Fase 1 (MVP inicial):** Next.js + PostgreSQL (Supabase). Migración desde `better-sqlite3` que fallaba en Vercel (SQLITE_READONLY).
 2. **Migración Turso planeada:** Se evaluó Turso/libSQL pero se optó por PostgreSQL directo.
-3. **MVP actual:** Determinista, sin AI, 6 pasos funcionales, tests completos.
+3. **Fase 2 (Reporting Redesign — 2026-07-14):** Expansión mayor del sistema de reportes:
+   - 3 modos de reporte (classified_bank_activity → preliminary_balance_sheet → complete_balance_sheet)
+   - Transfer matching automático entre cuentas
+   - Módulo de suspense como gatekeeper
+   - Cash rollforward puro (sin plugs)
+   - Opening balances con validación A - L = E
+   - Taxonomía canónica de 25 categorías (categoryOptions.ts)
+   - Transaction History expandido a 12 columnas de auditoría
+   - Review policy centralizado con estados de documentación
+   - Workbook XLSX con 5 sheets (Report Status, P&L, BS, Cash Rollforward, Reconciliation)
+   - Supabase MCP configurado
 
 ## Convenciones del Código
 

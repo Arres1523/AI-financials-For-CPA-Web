@@ -133,6 +133,27 @@ companies
 | export_type | TEXT | NOT NULL |
 | created_at | TIMESTAMPTZ | DEFAULT now() |
 
+### opening_balance_entries (v4)
+| Columna | Tipo | Restricciones |
+|---------|------|---------------|
+| id | TEXT | PK |
+| workspace_id | TEXT | NOT NULL, FK → workspaces(id) |
+| account_name | TEXT | NOT NULL |
+| account_type | TEXT | NOT NULL, CHECK IN ('asset','liability','equity') |
+| amount | REAL | DEFAULT 0 |
+| source | TEXT | DEFAULT 'manual' |
+| support_status | TEXT | DEFAULT 'provided', CHECK IN ('provided','missing','reviewed') |
+| created_at | TEXT | DEFAULT datetime('now') |
+
+## Migraciones
+
+| Versión | Archivo | Descripción |
+|---------|---------|-------------|
+| `v1_initial` | Embebida en db.ts | 8 tablas base |
+| `v2_duplicate_fingerprint` | Embebida en db.ts | Índices duplicados |
+| `v3_canonical_categories` | `src/lib/migrations/` | Estandarización categorías canónicas |
+| `v4_opening_balance_entries` | `src/lib/migrations/004_opening_balance_entries.sql` | Tabla opening_balance_entries |
+
 ## Índices
 
 ```sql
@@ -142,10 +163,14 @@ CREATE INDEX IF NOT EXISTS idx_uploaded_statements_hash
   ON uploaded_statements(file_hash);
 CREATE INDEX IF NOT EXISTS idx_transactions_fingerprint
   ON transactions(workspace_id, date, description, amount);
+-- v4:
+CREATE INDEX IF NOT EXISTS idx_opening_balance_workspace
+  ON opening_balance_entries(workspace_id);
 ```
 
 ## 🔗 Enlaces Relacionados
 
 - [[Base de Datos]]
 - [[API Endpoints]]
+- [[Opening Balances]]
 - [[Decisiones Técnicas]]

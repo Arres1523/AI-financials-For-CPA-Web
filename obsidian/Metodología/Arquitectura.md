@@ -32,19 +32,26 @@ Frontend (Next.js App Router)
 
 Backend (Next.js API Routes)
   ├── Domain Layer (pure functions)
-  │   ├── classification.ts    → Motor de reglas
-  │   ├── importXlsx.ts        → Parseo XLSX
-  │   ├── importCsv.ts         → Parseo CSV
-  │   ├── reconciliation.ts    → Matemática de conciliación
-  │   ├── reporting.ts         → Agregación P&L / BS
-  │   └── cpaPackage.ts        → Estado del paquete
+  │   ├── classification.ts       → Motor de reglas (21 reglas)
+  │   ├── categoryOptions.ts      → Taxonomía canónica de 25 categorías
+  │   ├── reviewPolicy.ts         → Estados de revisión y documentación
+  │   ├── classificationStatus.ts → Helpers de status (getClassificationStatus, getDocumentationStatus)
+  │   ├── importXlsx.ts           → Parseo XLSX
+  │   ├── importCsv.ts            → Parseo CSV
+  │   ├── reconciliation.ts       → Matemática de conciliación
+  │   ├── transferMatching.ts     → Matching de transferencias internas (±3 días, ±1¢)
+  │   ├── suspense.ts             → Detección de transacciones en suspenso
+  │   ├── reporting.ts            → buildFinancialReport (modos, controles, P&L, BS)
+  │   ├── cashRollforward.ts      → Reconciliación cash vs transacciones
+  │   ├── openingBalances.ts      → Validación A - L = E de saldos de apertura
+  │   └── cpaPackage.ts           → Estado del paquete
   │
   ├── Export Layer
-  │   ├── workbook.ts          → ExcelJS (P&L, BS, Tx History)
-  │   └── cpaMemo.ts           → docx (CPA memo)
+  │   ├── workbook.ts             → ExcelJS (P&L, BS, Cash Rollforward, Tx History 12 cols, Report Status, Reconciliation)
+  │   └── cpaMemo.ts              → docx (CPA memo)
   │
   └── Database Layer
-      └── lib/db.ts            → pg pool + migraciones automáticas
+      └── lib/db.ts               → pg pool + migraciones automáticas (v1-v4)
 
 Infrastructure
   ├── Vercel (hosting Next.js)
@@ -59,6 +66,9 @@ Infrastructure
 4. **PostgreSQL + Migraciones Embebidas** — Sin ORM. Las migraciones se ejecutan automáticamente al conectar.
 5. **Clasificación Determinista** — Sin AI externa. 100% basada en reglas con regex.
 6. **Disclaimer Preliminar** — Todos los reportes advierten que son preliminares.
+7. **Report Modes** — 3 modos de reporte: `classified_bank_activity`, `preliminary_balance_sheet`, `complete_balance_sheet`.
+8. **Transfer Matching Automático** — Detecta transferencias entre cuentas propias y las excluye del P&L/BS.
+9. **Cash Rollforward Puro** — Sin ajustes ni "plugs": opening + inflows - outflows = calculated ending vs actual.
 
 ## 📁 Estructura de Archivos Clave
 
@@ -66,16 +76,24 @@ Infrastructure
 |------|-----------|
 | `src/app/page.tsx` | Punto de entrada único, renderiza `<Wizard />` |
 | `src/components/wizard/` | Componentes del wizard (8 archivos) |
-| `src/domain/` | Lógica de negocio (7 archivos) |
+| `src/domain/` | Lógica de negocio (14 archivos) |
 | `src/exports/` | Generación de archivos (2 archivos) |
 | `src/lib/db.ts` | Conexión PostgreSQL + migraciones |
-| `src/app/api/` | Rutas API (12 endpoints) |
+| `src/lib/migrations/` | Migraciones SQL individuales (v1-v4) |
+| `src/app/api/` | Rutas API (13 endpoints) |
 | `tests/` | Tests unitarios + fixtures |
 | `e2e/` | Tests end-to-end Playwright |
 
 ## 🔗 Enlaces Relacionados
 
 - [[Flujo de Trabajo]]
+- [[Financial Reporting]]
+- [[Transfer Matching]]
+- [[Suspense]]
+- [[Cash Rollforward]]
+- [[Opening Balances]]
+- [[Category Options]]
+- [[Review Policy]]
 - [[Base de Datos]]
 - [[API Endpoints]]
 - [[Decisiones Técnicas]]

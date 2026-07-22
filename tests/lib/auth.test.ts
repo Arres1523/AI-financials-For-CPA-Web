@@ -72,7 +72,7 @@ describe("auth helpers", () => {
 
 describe("UnauthorizedError", () => {
   it("is an instance of Error with name UnauthorizedError", async () => {
-    const { UnauthorizedError } = await import("@/lib/auth");
+    const { UnauthorizedError } = await import("@/lib/require-user");
     const err = new UnauthorizedError();
     expect(err).toBeInstanceOf(Error);
     expect(err.name).toBe("UnauthorizedError");
@@ -80,7 +80,7 @@ describe("UnauthorizedError", () => {
   });
 
   it("accepts custom message", async () => {
-    const { UnauthorizedError } = await import("@/lib/auth");
+    const { UnauthorizedError } = await import("@/lib/require-user");
     const err = new UnauthorizedError("Custom message");
     expect(err.message).toBe("Custom message");
   });

@@ -3,7 +3,7 @@ import { query, queryOne, execute } from "@/lib/db";
 import { buildFinancialReport } from "@/domain/reporting";
 import { buildWorkbookBuffer } from "@/exports/workbook";
 import { v4 as uuid } from "uuid";
-import { requireUser, UnauthorizedError } from "@/lib/auth";
+import { requireUser, UnauthorizedError } from "@/lib/require-user";
 
 export const runtime = "nodejs";
 

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { query, queryOne, withTransaction } from "@/lib/db";
 import { v4 as uuid } from "uuid";
 import { CATEGORY_OPTIONS } from "@/domain/categoryOptions";
-import { requireUser, UnauthorizedError } from "@/lib/auth";
+import { requireUser, UnauthorizedError } from "@/lib/require-user";
 
 export const runtime = "nodejs";
 

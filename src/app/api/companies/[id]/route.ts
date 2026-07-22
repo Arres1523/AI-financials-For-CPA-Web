@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { queryOne, execute } from "@/lib/db";
-import { requireUser, UnauthorizedError } from "@/lib/auth";
+import { requireUser, UnauthorizedError } from "@/lib/require-user";
 
 export const runtime = "nodejs";
 

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { buildMemoModel } from "../../../../domain/cpaPackage";
 import type { CpaPackage, TransactionWithClassification } from "../../../../domain/types";
 import { buildCpaMemoBuffer } from "../../../../exports/cpaMemo";
-import { requireUser, UnauthorizedError } from "@/lib/auth";
+import { requireUser, UnauthorizedError } from "@/lib/require-user";
 
 export const runtime = "nodejs";
 

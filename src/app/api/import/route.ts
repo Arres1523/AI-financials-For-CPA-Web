@@ -5,7 +5,7 @@ import { importRows, hashFile } from "@/domain/importXlsx";
 import type { ColumnMapping } from "@/domain/types";
 import { classifyTransaction } from "@/domain/classification";
 import { z } from "zod";
-import { requireUser, UnauthorizedError } from "@/lib/auth";
+import { requireUser, UnauthorizedError } from "@/lib/require-user";
 
 export const runtime = "nodejs";
 

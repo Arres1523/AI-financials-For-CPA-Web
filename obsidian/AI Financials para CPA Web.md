@@ -15,7 +15,7 @@ created: 2026-07-13
 - **Estado:** MVP funcional — 6 pasos operativos completos
 - **Testing:** Vitest (unit) + Playwright (E2E) + 39 archivos de test
 - **Despliegue:** Vercel (Next.js) + Supabase (PostgreSQL)
-- **Última actualización:** 2026-07-14 — Reporting Redesign (modos de reporte, transfer matching, suspense, opening balances, cash rollforward)
+- **Última actualización:** 2026-07-22 — Resend Email Integration + Auth/RLS Hardening + Custom SMTP
 
 ## 🧭 Navegación Rápida
 
@@ -43,6 +43,7 @@ created: 2026-07-13
 - [[Errores Conocidos]] — Bugs y problemas identificados
 - [[Edge Cases]] — Casos borde a considerar
 - [[Deuda Técnica]] — Cosas pendientes por mejorar
+- [[Resend Email Integration]] — Issues y contexto de la integración de email
 
 ### Mejoras
 - [[Roadmap]] — Próximos pasos y visión a futuro
@@ -69,3 +70,7 @@ created: 2026-07-13
 - [Implementation Plan](../docs/superpowers/plans/2026-07-13-annual-cpa-package-mvp.md)
 - [Reporting Redesign Plan](../docs/superpowers/plans/2026-07-14-reporting-redesign.md)
 - [Reporting Redesign Design Spec](../docs/superpowers/specs/2026-07-14-reporting-redesign-design.md)
+- [Resend Email Integration Design Spec](../docs/superpowers/specs/2026-07-22-resend-email-integration-design.md)
+- [Resend Email Integration Plan](../docs/superpowers/plans/2026-07-22-resend-email-integration.md)
+- [Auth/RLS Hardening Plan](../docs/superpowers/plans/2026-07-16-auth-rls-hardening.md)
+- [Auth/RLS Hardening Design Spec](../docs/superpowers/specs/2026-07-16-auth-rls-hardening-design.md)

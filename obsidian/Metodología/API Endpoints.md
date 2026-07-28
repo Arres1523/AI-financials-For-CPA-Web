@@ -15,6 +15,7 @@ tags:
 
 | Endpoint | Método | Propósito |
 |----------|--------|-----------|
+| `/api/auth/register` | POST | Crear usuario Supabase confirmado desde servidor usando Admin Auth (`email_confirm: true`) |
 | `/api/upload` | POST | Preview XLSX (columnas, sample rows, mapping detectado) |
 | `/api/companies` | GET | Listar compañías (ordenadas por legal_name) |
 | `/api/companies` | POST | Crear compañía (unique legal_name) |
@@ -38,6 +39,7 @@ tags:
 ## Notas sobre las Rutas
 
 - Todas las API routes usan `export const runtime = "nodejs"` (no Edge)
+- `/api/auth/register` requiere `SUPABASE_SERVICE_ROLE_KEY` server-side. No debe exponerse en `NEXT_PUBLIC_*`.
 - `/api/upload` NO guarda el archivo — solo hace preview
 - `/api/import` es la única que escribe en BD (transaccional)
 - `/api/classifications` registra cada acción en `review_events` (audit log)
@@ -50,3 +52,4 @@ tags:
 - [[Opening Balances]]
 - [[Workbook Export]]
 - [[Errores Conocidos]] — Problemas conocidos en API
+- [[Supabase Auth Signup SMTP 535]]

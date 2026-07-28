@@ -65,6 +65,13 @@ created: 2026-07-22
 **Problema:** Los correos de confirmación de Supabase enviados via Resend SMTP tienen status "delivered" pero pueden caer en Spam/Promociones por usar `onboarding@resend.dev`.
 **Fix:** Revisar carpeta de Spam. Para producción, verificar dominio propio en Resend.
 
+### 10. Signup bloqueado por SMTP con credenciales inválidas (2026-07-28)
+**Archivo:** `src/app/register/RegisterForm.tsx`, `src/app/api/auth/register/route.ts`
+**Problema:** Supabase Auth devolvía `500 unexpected_failure` en `/signup` porque Custom SMTP respondía `535 "Authentication credentials invalid"`. La UI mostraba `{}` o un fallback genérico.
+**Fix aplicado:** El registro ya no usa `supabase.auth.signUp()` en browser. Ahora usa `POST /api/auth/register` con Supabase Admin Auth y `email_confirm: true`, luego inicia sesión con `signInWithPassword`.
+**Requisito operativo:** `SUPABASE_SERVICE_ROLE_KEY` debe existir en Vercel Production y Preview.
+**Nota completa:** [[Supabase Auth Signup SMTP 535]]
+
 ## 🟢 Buenas Prácticas Aplicadas
 
 ### 1. Resend client singleton pattern
@@ -152,8 +159,10 @@ curl -X POST https://your-domain.com/api/emails/report \
 4. Agregar tracking de welcome email en `profiles.welcome_email_sent` para atomicidad
 5. Rate limiting en API routes de email
 6. Error handler global en API routes
+7. Reparar Custom SMTP de Supabase aunque el registro ya no dependa de confirmation emails, porque password reset y otros emails de Auth todavía lo necesitan.
 
 ## 🔗 Enlaces Relacionados
 - [[Errores Conocidos]]
+- [[Supabase Auth Signup SMTP 535]]
 - [[Deuda Técnica]]
 - [[Decisiones Técnicas]]

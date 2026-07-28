@@ -18,6 +18,7 @@ Frontend (Next.js App Router)
   │   └── Step 6: Results + Export
   │
   ├── API Routes (Next.js → PostgreSQL)
+  │   ├── /api/auth/register → Crear usuario confirmado con Supabase Admin Auth
   │   ├── /api/upload          → Preview XLSX
   │   ├── /api/import          → Import + Classify
   │   ├── /api/companies       → CRUD
@@ -58,6 +59,30 @@ Infrastructure
   └── Supabase / Neon (PostgreSQL)
 ```
 
+## Auth y Registro
+
+El registro de usuarios se maneja desde servidor para evitar que la creación de cuentas dependa del email de confirmación de Supabase Auth.
+
+```mermaid
+flowchart LR
+    Register["/register"] --> Api["POST /api/auth/register"]
+    Api --> Admin["Supabase Admin Auth createUser"]
+    Admin --> Confirm["email_confirm: true"]
+    Confirm --> Login["signInWithPassword"]
+    Login --> App["/"]
+```
+
+Variables requeridas:
+
+| Variable | Uso | Exposición |
+|----------|-----|------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Cliente Supabase browser/server | Pública |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Cliente Supabase browser/server | Pública |
+| `SUPABASE_SERVICE_ROLE_KEY` | `src/lib/supabase/admin.ts` para Admin Auth | Secreta, server-only |
+
+> [!warning]
+> `SUPABASE_SERVICE_ROLE_KEY` nunca debe tener prefijo `NEXT_PUBLIC_` ni guardarse en git. En Vercel debe existir en Production y Preview.
+
 ## Principios Arquitectónicos
 
 1. **Single-Page Wizard** — Toda la funcionalidad en una sola ruta con máquina de estados cliente.
@@ -75,6 +100,7 @@ Infrastructure
 | Ruta | Propósito |
 |------|-----------|
 | `src/app/page.tsx` | Punto de entrada único, renderiza `<Wizard />` |
+| `src/app/api/auth/register/route.ts` | Registro server-side con Supabase Admin Auth |
 | `src/components/wizard/` | Componentes del wizard (8 archivos) |
 | `src/domain/` | Lógica de negocio (14 archivos) |
 | `src/exports/` | Generación de archivos (2 archivos) |
@@ -97,3 +123,4 @@ Infrastructure
 - [[Base de Datos]]
 - [[API Endpoints]]
 - [[Decisiones Técnicas]]
+- [[Supabase Auth Signup SMTP 535]]

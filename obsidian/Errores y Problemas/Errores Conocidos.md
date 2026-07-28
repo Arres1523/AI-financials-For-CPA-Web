@@ -26,6 +26,13 @@ tags:
 **Estado:** ⚠️ Detectado pero no manejado elegantemente
 **Descripción:** El fingerprint detecta filas duplicadas dentro del mismo archivo, pero si hay muchas (ej. archivo corrupto o mal exportado), la respuesta de error es genérica.
 
+### 5. Registro muestra `{}` o error genérico por SMTP de Supabase Auth (RESUELTO)
+**Estado:** ✅ Resuelto con registro server-side vía Supabase Admin Auth
+**Síntoma:** `/register` mostraba `{}` o `Account creation failed...` y no creaba el usuario.
+**Causa:** Supabase Auth intentaba mandar confirmation email y Custom SMTP respondía `535 "Authentication credentials invalid"`.
+**Solución:** Evitar `supabase.auth.signUp()` en browser. Usar `POST /api/auth/register` con `SUPABASE_SERVICE_ROLE_KEY` y `email_confirm: true`, luego `signInWithPassword`.
+**Nota:** [[Supabase Auth Signup SMTP 535]]
+
 ## ⚠️ Casos No Cubiertos (Potenciales Bugs)
 
 ### Archivos Multi-Sheet
@@ -54,4 +61,5 @@ tags:
 
 - [[Edge Cases]]
 - [[Deuda Técnica]]
+- [[Supabase Auth Signup SMTP 535]]
 - [[Testing]]

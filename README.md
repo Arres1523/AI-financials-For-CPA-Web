@@ -7,7 +7,8 @@ Annual financial workflow MVP for CPAs. Processes XLSX bank statements, auto-cla
 - Node.js 24.x
 - pnpm (see `packageManager` in package.json)
 - A Postgres database (Supabase, Neon, or local)
-- A [Resend](https://resend.com) account for transactional emails
+- A Supabase project with Auth enabled
+- A [Resend](https://resend.com) account for app transactional emails
 
 ```bash
 # Use the correct Node version
@@ -53,6 +54,12 @@ RESEND_API_KEY=re_xxxxxxxxxxxx
 RESEND_FROM_EMAIL=Valoris <noreply@your-domain.com>
 ```
 
+### Supabase Auth Keys
+
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` is used by browser code for normal user sessions.
+
+`SUPABASE_SERVICE_ROLE_KEY` is used only by the server route `/api/auth/register` to create confirmed users with Supabase Admin Auth. Never expose it with a `NEXT_PUBLIC_` prefix and never commit it to git.
+
 ## Access Protection
 
 The app uses Supabase Auth for every page and API route. All unauthenticated requests return `401` or redirect to `/login`.
@@ -60,14 +67,33 @@ The app uses Supabase Auth for every page and API route. All unauthenticated req
 Recommended Supabase Auth setup:
 
 - disable public signups
-- create approved users in the Supabase Auth dashboard
+- keep `SUPABASE_SERVICE_ROLE_KEY` configured in Vercel for Production and Preview
 - use email/password sign-in for this app
-- configure Custom SMTP with Resend for reliable email delivery
+- configure Custom SMTP with Resend for password resets and other Auth emails
 
 Run these SQL scripts in the Supabase SQL editor after initial setup:
 
 1. [`supabase/security/2026-07-15-lockdown.sql`](supabase/security/2026-07-15-lockdown.sql) — revoke anon access, enable RLS on all tables, create storage bucket
 2. [`supabase/migrations/2026-07-16-auth-rls-hardening.sql`](supabase/migrations/2026-07-16-auth-rls-hardening.sql) — add per-user RLS policies, add user_id columns, auto-create profiles on signup
+
+### Registration Flow
+
+`/register` does not call `supabase.auth.signUp()` from the browser. Browser sign-up depends on Supabase confirmation email delivery, so broken SMTP can block account creation with an unhelpful `{}` or generic error.
+
+Instead, the form calls:
+
+```txt
+POST /api/auth/register
+```
+
+That server route uses `SUPABASE_SERVICE_ROLE_KEY` and `supabase.auth.admin.createUser({ email_confirm: true })`, then the client signs in with `signInWithPassword`.
+
+If registration fails in production:
+
+1. Check Vercel has `SUPABASE_SERVICE_ROLE_KEY` in both Production and Preview.
+2. Redeploy after changing env vars.
+3. Check Supabase Auth logs for SMTP errors such as `535 "Authentication credentials invalid"`.
+4. Check Vercel runtime logs for `/api/auth/register`.
 
 ## Features
 
@@ -81,7 +107,8 @@ Run these SQL scripts in the Supabase SQL editor after initial setup:
 - **25 canonical categories**: Taxonomy centralized in `categoryOptions.ts`
 - **CPA Memo**: Generate .docx memo documents with document checklist
 - **Email delivery**: Send financial reports as XLSX attachments or CPA Memos as .docx via Resend
-- **Welcome email**: Automated welcome email on first sign-in confirmation
+- **Server-side registration**: Create confirmed Supabase users without depending on Auth confirmation email delivery
+- **Welcome email**: Automated welcome email endpoint for confirmed-session flows
 
 ## Quick Start
 
@@ -97,10 +124,10 @@ Run these SQL scripts in the Supabase SQL editor after initial setup:
 
 - **Frontend**: Next.js 15 (App Router), React 19, Tailwind CSS
 - **Backend**: Next.js API routes, Postgres via `pg` (Supabase compatible)
+- **Auth**: Supabase Auth; server-side registration via Admin Auth; browser sessions via `@supabase/ssr`
 - **Import**: `xlsx` (SheetJS), first-sheet-only, deterministic classification with preclassification review
 - **Export**: ExcelJS — P&L, Balance Sheet, Cash Rollforward, Transaction History (12 audit columns); docx — CPA Memo
 - **Email**: Resend SDK — welcome emails, report delivery with attachments
-- **Auth**: Supabase Auth with Custom SMTP (Resend), per-user RLS policies
 - **Testing**: Vitest (unit), Playwright (E2E)
 
 ## MVP Boundaries

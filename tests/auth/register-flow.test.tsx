@@ -3,14 +3,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import RegisterForm from "@/app/register/RegisterForm";
 
-const mockSignUp = vi.fn();
+const mockSignIn = vi.fn();
 const mockReplace = vi.fn();
 const mockRefresh = vi.fn();
+const mockFetch = vi.fn();
 
 vi.mock("@/lib/supabase/browser", () => ({
   createClient: () => ({
     auth: {
-      signUp: (...args: unknown[]) => mockSignUp(...args),
+      signInWithPassword: (...args: unknown[]) => mockSignIn(...args),
     },
   }),
 }));
@@ -21,13 +22,15 @@ vi.mock("next/navigation", () => ({
 
 describe("RegisterForm", () => {
   beforeEach(() => {
-    mockSignUp.mockReset();
+    mockSignIn.mockReset();
     mockReplace.mockReset();
     mockRefresh.mockReset();
+    mockFetch.mockReset();
+    vi.stubGlobal("fetch", mockFetch);
   });
 
   it("recovers when account creation fails unexpectedly", async () => {
-    mockSignUp.mockRejectedValue(new Error("network failed"));
+    mockFetch.mockRejectedValue(new Error("network failed"));
 
     render(<RegisterForm />);
     fireEvent.change(screen.getByLabelText("Full name"), {
@@ -49,11 +52,13 @@ describe("RegisterForm", () => {
     });
   });
 
-  it("shows Supabase sign-up errors and unlocks the form", async () => {
-    mockSignUp.mockResolvedValue({
-      data: { session: null },
-      error: { message: "User already registered" },
-    });
+  it("shows registration API errors and unlocks the form", async () => {
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ error: "User already registered" }), {
+        status: 400,
+        headers: { "content-type": "application/json" },
+      })
+    );
 
     render(<RegisterForm />);
     fireEvent.change(screen.getByLabelText("Email"), {
@@ -70,11 +75,13 @@ describe("RegisterForm", () => {
     });
   });
 
-  it("shows a useful fallback when Supabase returns an unreadable sign-up error", async () => {
-    mockSignUp.mockResolvedValue({
-      data: { session: null },
-      error: { message: "{}" },
-    });
+  it("shows a useful fallback when registration returns an unreadable error", async () => {
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ error: "{}" }), {
+        status: 500,
+        headers: { "content-type": "application/json" },
+      })
+    );
 
     render(<RegisterForm />);
     fireEvent.change(screen.getByLabelText("Email"), {
@@ -93,15 +100,18 @@ describe("RegisterForm", () => {
     });
   });
 
-  it("redirects authenticated sign-ups to the app", async () => {
-    mockSignUp.mockResolvedValue({
-      data: { session: { access_token: "token" } },
-      error: null,
-    });
+  it("creates the account through the server API and signs the user in", async () => {
+    mockFetch.mockResolvedValue(
+      new Response(JSON.stringify({ userId: "user-id" }), {
+        status: 201,
+        headers: { "content-type": "application/json" },
+      })
+    );
+    mockSignIn.mockResolvedValue({ error: null });
 
     render(<RegisterForm />);
     fireEvent.change(screen.getByLabelText("Email"), {
-      target: { value: "miguel@example.com" },
+      target: { value: " miguel@example.com " },
     });
     fireEvent.change(screen.getByLabelText("Password"), {
       target: { value: "password123" },
@@ -109,6 +119,19 @@ describe("RegisterForm", () => {
     fireEvent.submit(screen.getByRole("button", { name: /create account/i }));
 
     await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith("/api/auth/register", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email: "miguel@example.com",
+          password: "password123",
+          fullName: "",
+        }),
+      });
+      expect(mockSignIn).toHaveBeenCalledWith({
+        email: "miguel@example.com",
+        password: "password123",
+      });
       expect(mockReplace).toHaveBeenCalledWith("/");
       expect(mockRefresh).toHaveBeenCalled();
     });

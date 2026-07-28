@@ -41,6 +41,10 @@ DATABASE_URL=postgresql://postgres:password@db.xxxxx.supabase.co:5432/postgres
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 
+# Required — Supabase server-side Admin Auth for /register
+# Never expose this as NEXT_PUBLIC_*
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
 # Required for E2E tests (must be a separate test database)
 DATABASE_URL_TEST=
 

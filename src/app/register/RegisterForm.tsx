@@ -23,6 +23,15 @@ function getErrorMessage(error: unknown): string {
   ) {
     return error.message;
   }
+  if (
+    error &&
+    typeof error === "object" &&
+    "error" in error &&
+    typeof error.error === "string" &&
+    isReadableErrorMessage(error.error)
+  ) {
+    return error.error;
+  }
   return FALLBACK_ERROR_MESSAGE;
 }
 
@@ -37,7 +46,6 @@ export default function RegisterForm() {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -46,45 +54,45 @@ export default function RegisterForm() {
     setError(null);
 
     try {
-      const supabase = createClient();
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-        options: {
-          data: { full_name: fullName.trim() },
-          emailRedirectTo: `${location.origin}/auth/callback`,
-        },
+      const trimmedEmail = email.trim();
+      const trimmedFullName = fullName.trim();
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          email: trimmedEmail,
+          password,
+          fullName: trimmedFullName,
+        }),
       });
 
-      if (signUpError) {
-        setError(getSignUpErrorMessage(signUpError));
+      if (!response.ok) {
+        let registerError: unknown = null;
+        try {
+          registerError = await response.json();
+        } catch {}
+        setError(getSignUpErrorMessage(registerError));
         return;
       }
 
-      if (data.session) {
-        router.replace("/");
-        router.refresh();
+      const supabase = createClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password,
+      });
+
+      if (signInError) {
+        setError(getSignUpErrorMessage(signInError));
         return;
       }
 
-      setSuccess(true);
+      router.replace("/");
+      router.refresh();
     } catch (error) {
       setError(`Account creation failed: ${getErrorMessage(error)}`);
     } finally {
       setIsSubmitting(false);
     }
-  }
-
-  if (success) {
-    return (
-      <div className="rounded-lg border border-[#27272A] bg-[#111111] p-6">
-        <h2 className="text-lg font-mono font-semibold text-[#FFFFFF]">Check your email</h2>
-        <p className="mt-2 font-mono text-sm text-[#A1A1AA]">
-          We sent a confirmation link to <strong className="text-[#FFFFFF]">{email}</strong>.
-          Click the link to activate your account.
-        </p>
-      </div>
-    );
   }
 
   return (

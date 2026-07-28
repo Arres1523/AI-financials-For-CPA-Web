@@ -70,6 +70,29 @@ describe("RegisterForm", () => {
     });
   });
 
+  it("shows a useful fallback when Supabase returns an unreadable sign-up error", async () => {
+    mockSignUp.mockResolvedValue({
+      data: { session: null },
+      error: { message: {} },
+    });
+
+    render(<RegisterForm />);
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "miguel@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "password123" },
+    });
+    fireEvent.submit(screen.getByRole("button", { name: /create account/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert").textContent).toBe(
+        "Account creation failed. Check your connection and Supabase Auth settings, then try again."
+      );
+      expect((screen.getByRole("button", { name: /create account/i }) as HTMLButtonElement).disabled).toBe(false);
+    });
+  });
+
   it("redirects authenticated sign-ups to the app", async () => {
     mockSignUp.mockResolvedValue({
       data: { session: { access_token: "token" } },

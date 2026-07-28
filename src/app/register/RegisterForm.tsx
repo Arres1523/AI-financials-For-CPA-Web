@@ -5,9 +5,25 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/browser";
 
+const FALLBACK_ERROR_MESSAGE = "Check your connection and Supabase Auth settings, then try again.";
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
-  return "Check your connection and Supabase Auth settings, then try again.";
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string" &&
+    error.message.trim()
+  ) {
+    return error.message;
+  }
+  return FALLBACK_ERROR_MESSAGE;
+}
+
+function getSignUpErrorMessage(error: unknown): string {
+  const message = getErrorMessage(error);
+  return message === FALLBACK_ERROR_MESSAGE ? `Account creation failed. ${message}` : message;
 }
 
 export default function RegisterForm() {
@@ -36,7 +52,7 @@ export default function RegisterForm() {
       });
 
       if (signUpError) {
-        setError(signUpError.message);
+        setError(getSignUpErrorMessage(signUpError));
         return;
       }
 

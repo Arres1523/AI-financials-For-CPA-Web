@@ -38,6 +38,16 @@ export type WorkbookExportInput = {
   flaggedTransactions: Transaction[];
   accountReconData: { id: string; account_name: string; opening_balance: number; closing_balance: number; movement_total: number }[];
   statementFiles?: { fileName: string; fileType?: string | null; sourceName?: string | null; importedRows: number; uploadedAt: string }[];
+  reviewEvents?: {
+    transactionId: string;
+    action: string;
+    previousCategory: string | null;
+    newCategory: string | null;
+    previousStatus?: string | null;
+    newStatus?: string | null;
+    note?: string | null;
+    createdAt: string;
+  }[];
   includeTransactions: boolean;
 };
 
@@ -98,6 +108,24 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
         importedRows: file.importedRows,
         uploadedAt: file.uploadedAt,
       });
+    }
+  }
+
+  if (input.reviewEvents && input.reviewEvents.length > 0) {
+    const review = workbook.addWorksheet("Review Log", { views: [{ state: "frozen", xSplit: 0, ySplit: 1 }] });
+    review.columns = [
+      { header: "Transaction ID", key: "transactionId", width: 36 },
+      { header: "Action", key: "action", width: 22 },
+      { header: "Previous Category", key: "previousCategory", width: 28 },
+      { header: "New Category", key: "newCategory", width: 28 },
+      { header: "Previous Status", key: "previousStatus", width: 22 },
+      { header: "New Status", key: "newStatus", width: 22 },
+      { header: "Note", key: "note", width: 42 },
+      { header: "Created At", key: "createdAt", width: 24 },
+    ];
+    review.getRow(1).font = { bold: true };
+    for (const event of input.reviewEvents) {
+      review.addRow(event);
     }
   }
 

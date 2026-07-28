@@ -146,6 +146,20 @@ const MIGRATIONS: [string, string][] = [
     ALTER TABLE uploaded_statements ADD COLUMN IF NOT EXISTS source_name TEXT;
     ALTER TABLE uploaded_statements ADD COLUMN IF NOT EXISTS parser_version TEXT DEFAULT 'statement-import-v2';
   `],
+  ["v6_review_audit_and_company_rules", `
+    ALTER TABLE review_events DROP CONSTRAINT IF EXISTS review_events_action_check;
+    ALTER TABLE review_events ADD CONSTRAINT review_events_action_check
+      CHECK(action IN ('approve','reject','exclude','change_category','mark_support_needed','mark_cpa_review','correct_transaction'));
+    ALTER TABLE review_events ADD COLUMN IF NOT EXISTS previous_status TEXT;
+    ALTER TABLE review_events ADD COLUMN IF NOT EXISTS new_status TEXT;
+    ALTER TABLE review_events ADD COLUMN IF NOT EXISTS correction_json TEXT;
+
+    ALTER TABLE classification_rules ADD COLUMN IF NOT EXISTS direction TEXT DEFAULT 'any';
+    ALTER TABLE classification_rules ADD COLUMN IF NOT EXISTS review_status TEXT DEFAULT 'pending';
+    ALTER TABLE classification_rules ADD COLUMN IF NOT EXISTS confidence TEXT DEFAULT 'medium';
+    ALTER TABLE classification_rules ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP NOT NULL DEFAULT NOW();
+    CREATE INDEX IF NOT EXISTS idx_classification_rules_company_priority ON classification_rules(company_id, priority DESC);
+  `],
 ];
 
 async function initialize(): Promise<void> {

@@ -92,6 +92,27 @@ describe("buildWorkbookBuffer", () => {
     expect(sheet.getCell("D2").value).toBe(25);
   });
 
+  it("includes review log metadata when provided", async () => {
+    const workbook = await buildAndLoad({
+      ...minimalInput,
+      reviewEvents: [{
+        transactionId: "tx-1",
+        action: "mark_cpa_review",
+        previousCategory: "Wire Transfers",
+        newCategory: "Wire Transfers",
+        previousStatus: "support_needed",
+        newStatus: "cpa_review",
+        note: "Confirm treatment with CPA",
+        createdAt: "2026-01-02T00:00:00.000Z",
+      }],
+    });
+    const sheet = workbook.getWorksheet("Review Log")!;
+    expect(sheet).toBeDefined();
+    expect(sheet.getCell("A2").value).toBe("tx-1");
+    expect(sheet.getCell("B2").value).toBe("mark_cpa_review");
+    expect(sheet.getCell("G2").value).toBe("Confirm treatment with CPA");
+  });
+
   it("sets P&L column widths", async () => {
     const workbook = await buildAndLoad();
     const pnl = workbook.getWorksheet(`P&L 2025`)!;

@@ -102,6 +102,11 @@ export function classifyTransaction(transaction: Transaction): Classification {
   }
 
   // Balance Sheet — Member distributions
+  if (has(text, [/PARTNER/, /\bSOCIO\b/, /MEMBER/]) && has(text, [/TRANSFER/, /DISTRIBUTION/, /DRAW/, /PAYMENT/]) && amount < 0) {
+    return CPA_REVIEW(transaction.id, "Member distributions", "Balance Sheet", "Partner/member transfer — needs CPA review");
+  }
+
+  // Balance Sheet — Member distributions
   if (has(text, [/DISTRIBUTION/, /DRAW/, /OWNER PAY/, /MEMBER DISTRIBUTION/, /OWNER WITHDRAW/]) && amount < 0) {
     return HIGH(transaction.id, "Member distributions", "Balance Sheet", "Owner distribution pattern");
   }

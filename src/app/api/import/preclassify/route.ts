@@ -64,7 +64,12 @@ export async function POST(request: Request) {
       [workspaceId, fileHash, user.id]
     );
 
-    const result = preclassifyImportRows(buffer, file.name, mapping, workspaceId, bankAccountId, taxYear);
+    const workspace = await queryOne(
+      "SELECT company_id FROM workspaces WHERE id = $1 AND user_id = $2",
+      [workspaceId, user.id]
+    );
+    const companyRules = workspace ? await queryCompanyRules(workspace.company_id, user.id) : [];
+    const result = preclassifyImportRows(buffer, file.name, mapping, workspaceId, bankAccountId, taxYear, companyRules);
     const rows = await Promise.all(result.rows.map(async (row) => {
       const globalSuggestion = await classifyWithGlobalFinancialModel(row.classificationText || row.description);
       if (!globalSuggestion) return row;
@@ -107,4 +112,24 @@ export async function POST(request: Request) {
     }
     throw e;
   }
+}
+
+async function queryCompanyRules(companyId: string, userId: string) {
+  const rows = await (await import("@/lib/db")).query(
+    `SELECT id, company_id, pattern, direction, category, report_type, priority, created_at
+     FROM classification_rules
+     WHERE company_id = $1 AND user_id = $2
+     ORDER BY priority DESC, created_at ASC`,
+    [companyId, userId]
+  );
+  return rows.map((row: any) => ({
+    id: row.id,
+    companyId: row.company_id,
+    pattern: row.pattern,
+    direction: row.direction ?? "any",
+    finalCategory: row.category,
+    reportType: row.report_type,
+    priority: row.priority ?? 0,
+    createdAt: row.created_at,
+  }));
 }

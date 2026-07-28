@@ -93,6 +93,44 @@ export type ClassificationRule = {
   createdAt: string;
 };
 
+export type CompanyClassificationRule = {
+  id: string;
+  companyId: string;
+  pattern: string;
+  direction: "in" | "out" | "any";
+  finalCategory: string;
+  reportType: ReportType;
+  priority: number;
+  createdAt: string;
+};
+
+export type ReviewAction =
+  | "approve"
+  | "exclude"
+  | "change_category"
+  | "mark_support_needed"
+  | "mark_cpa_review"
+  | "correct_transaction";
+
+export type TransactionCorrection = {
+  date?: string;
+  description?: string;
+  amount?: number;
+};
+
+export type ReviewNote = {
+  transactionId: string;
+  action: ReviewAction;
+  note?: string;
+};
+
+export type ReconciliationIssue = {
+  accountId: string;
+  accountName: string;
+  type: "missing_statement" | "duplicate_suspected" | "running_balance_mismatch" | "outside_fiscal_year" | "variance";
+  message: string;
+};
+
 export type CounterpartyRule = {
   id: string;
   companyId: string;
@@ -319,8 +357,11 @@ export type ImportError = {
 
 export type BulkReviewAction = {
   transactionIds: string[];
-  action: "approve" | "exclude";
+  action: ReviewAction;
   newCategory?: string;
+  reviewStatus?: ReviewStatus;
+  note?: string;
+  correction?: TransactionCorrection;
 };
 
 // Legacy CPA package types (kept for compatibility)
@@ -352,4 +393,8 @@ export type CpaMemoModel = {
   included: string[];
   missingDocuments: string[];
   openReviewItems: string[];
+  statementFormats?: string[];
+  relatedPartyItems?: string[];
+  reconciliationVariances?: string[];
+  importNotes?: string[];
 };

@@ -12,13 +12,14 @@ type Props = {
   accounts: BankAccount[];
   reconciliation: ReconciliationResult[];
   onNewWorkflow: () => void;
+  onReviewPreset?: (tab: "exceptions" | "all" | "related" | "credit_cards" | "low" | "unreconciled", accountId?: string) => void;
 };
 
 function money(val: number): string {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(val);
 }
 
-export default function ResultsStep({ workspace, company, accounts, reconciliation, onNewWorkflow }: Props) {
+export default function ResultsStep({ workspace, company, accounts, reconciliation, onNewWorkflow, onReviewPreset }: Props) {
   const [transactions, setTransactions] = useState<TransactionWithClassification[]>([]);
   const [statementCount, setStatementCount] = useState(0);
   const [exporting, setExporting] = useState(false);
@@ -38,6 +39,15 @@ export default function ResultsStep({ workspace, company, accounts, reconciliati
   const reports = buildFinancialReport(company.legalName, workspace.taxYear, accounts, transactions, classifications);
   const totalImported = transactions.length;
   const pendingReview = transactions.filter((t) => requiresReview(t.classification)).length;
+  const relatedPartyCount = transactions.filter((t) => {
+    const haystack = `${t.description} ${t.classification?.finalCategory ?? ""} ${t.classification?.ruleUsed ?? ""}`.toLowerCase();
+    return /(valoris|related party|intercompany|affiliate|due from related|due to related|member distributions)/.test(haystack);
+  }).length;
+  const creditCardCount = transactions.filter((t) => {
+    const haystack = `${t.description} ${t.classification?.finalCategory ?? ""} ${t.classification?.reviewStatus ?? ""}`.toLowerCase();
+    return /(credit card|card statements|card payable|amex|citi|autopay)/.test(haystack);
+  }).length;
+  const unreconciled = reports.bankReconciliation.filter((r) => r.status === "unreconciled");
 
   async function handleExport(withTransactions: boolean) {
     setExportType(withTransactions ? "withTransactions" : "financial");
@@ -126,6 +136,26 @@ export default function ResultsStep({ workspace, company, accounts, reconciliati
       )}
 
       {/* Alerts */}
+      <div className="rounded border border-line p-4">
+        <h3 className="mb-3 text-sm font-semibold">Review shortcuts</h3>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" onClick={() => onReviewPreset?.("exceptions")} className="rounded border border-line px-3 py-2 text-xs hover:bg-paper">
+            Unresolved classifications ({pendingReview})
+          </button>
+          <button type="button" onClick={() => onReviewPreset?.("related")} className="rounded border border-line px-3 py-2 text-xs hover:bg-paper">
+            Related party review ({relatedPartyCount})
+          </button>
+          <button type="button" onClick={() => onReviewPreset?.("credit_cards")} className="rounded border border-line px-3 py-2 text-xs hover:bg-paper">
+            Credit card statements needed ({creditCardCount})
+          </button>
+          {unreconciled.map((item) => (
+            <button key={item.accountId} type="button" onClick={() => onReviewPreset?.("unreconciled", item.accountId)} className="rounded border border-red-200 px-3 py-2 text-xs text-red-700 hover:bg-red-50">
+              Unreconciled: {item.accountName}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {reports.bankReconciliation.some(r => r.status === "unreconciled") && (
         <div className="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           <p className="font-medium">Bank Reconciliation</p>

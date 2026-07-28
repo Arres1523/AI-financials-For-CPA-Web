@@ -5,6 +5,7 @@ import { hashFile } from "@/domain/importXlsx";
 import { detectStatementFileType, importStatementRows } from "@/domain/statementImport";
 import type { ColumnMapping, PreclassificationOverride } from "@/domain/types";
 import { classifyTransaction } from "@/domain/classification";
+import { applyCompanyClassificationRules } from "@/domain/classificationRules";
 import { applyPreclassificationOverride } from "@/domain/importPreclassification";
 import { z } from "zod";
 import { requireUser, UnauthorizedError } from "@/lib/require-user";
@@ -95,6 +96,11 @@ export async function POST(request: Request) {
     }
 
     const statementId = uuid();
+    const workspace = await queryOne(
+      "SELECT company_id FROM workspaces WHERE id = $1 AND user_id = $2",
+      [workspaceId, user.id]
+    );
+    const companyRules = workspace ? await queryCompanyRules(workspace.company_id, user.id) : [];
 
     const imported = await withTransaction(async (client) => {
       await client.query(
@@ -110,7 +116,7 @@ export async function POST(request: Request) {
           "INSERT INTO transactions (id, workspace_id, bank_account_id, statement_id, date, description, amount, balance, original_row_index, user_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
           [txId, workspaceId, bankAccountId, statementId, row.date, row.description, row.amount, row.balance, row.rowIndex, user.id]
         );
-        const classification = applyPreclassificationOverride(classifyTransaction({
+        const txForClassification = {
           id: txId,
           workspaceId,
           bankAccountId,
@@ -121,7 +127,11 @@ export async function POST(request: Request) {
           balance: row.balance,
           originalRowIndex: row.rowIndex,
           createdAt: new Date().toISOString(),
-        }), overridesByRow.get(row.rowIndex));
+        };
+        const classification = applyPreclassificationOverride(
+          applyCompanyClassificationRules(classifyTransaction(txForClassification), txForClassification, companyRules),
+          overridesByRow.get(row.rowIndex)
+        );
         await client.query(
           "INSERT INTO classifications (id, transaction_id, final_category, report_type, confidence, rule_used, review_status, is_manual_correction, user_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
           [classification.id, txId, classification.finalCategory, classification.reportType, classification.confidence, classification.ruleUsed, classification.reviewStatus, classification.isManualCorrection ? 1 : 0, user.id]
@@ -142,4 +152,24 @@ export async function POST(request: Request) {
     }
     throw e;
   }
+}
+
+async function queryCompanyRules(companyId: string, userId: string) {
+  const rows = await query(
+    `SELECT id, company_id, pattern, direction, category, report_type, priority, created_at
+     FROM classification_rules
+     WHERE company_id = $1 AND user_id = $2
+     ORDER BY priority DESC, created_at ASC`,
+    [companyId, userId]
+  );
+  return rows.map((row: any) => ({
+    id: row.id,
+    companyId: row.company_id,
+    pattern: row.pattern,
+    direction: row.direction ?? "any",
+    finalCategory: row.category,
+    reportType: row.report_type,
+    priority: row.priority ?? 0,
+    createdAt: row.created_at,
+  }));
 }

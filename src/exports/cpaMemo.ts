@@ -4,6 +4,10 @@ import type { CpaMemoModel } from "../domain/types";
 export function buildCpaMemoText(model: CpaMemoModel): string {
   const missing = model.missingDocuments.length ? model.missingDocuments : ["None noted"];
   const open = model.openReviewItems.length ? model.openReviewItems : ["None noted"];
+  const formats = model.statementFormats?.length ? model.statementFormats.join(", ") : "Not specified";
+  const related = model.relatedPartyItems?.length ? model.relatedPartyItems : ["None noted"];
+  const variances = model.reconciliationVariances?.length ? model.reconciliationVariances : ["None noted"];
+  const importNotes = model.importNotes?.length ? model.importNotes : ["PDF import supports text-based files only; scanned PDFs require conversion or OCR outside this workflow."];
 
   return [
     `Subject: ${model.llcName} - ${model.taxYear} CPA Package`,
@@ -20,6 +24,16 @@ export function buildCpaMemoText(model: CpaMemoModel): string {
     "",
     "Open CPA review items:",
     ...open.map((item) => `- ${item}`),
+    "",
+    "Import summary:",
+    `- Formats imported: ${formats}`,
+    ...importNotes.map((item) => `- ${item}`),
+    "",
+    "Related-party items:",
+    ...related.map((item) => `- ${item}`),
+    "",
+    "Reconciliation variances:",
+    ...variances.map((item) => `- ${item}`),
     "",
     "Notes:",
     "- Valoris did not prepare K-1s.",

@@ -2,13 +2,14 @@
 import React from "react";
 
 import { useState, useEffect, useCallback } from "react";
-import type { TransactionWithClassification, Workspace } from "@/domain/types";
+import type { ReviewAction, ReviewStatus, TransactionCorrection, TransactionWithClassification, Workspace } from "@/domain/types";
 import { requiresReview } from "@/domain/reviewPolicy";
 import { getCategoriesByReport, isValidCategory } from "@/domain/categoryOptions";
 
 type Props = {
   workspace: Workspace;
   initialAccountId?: string | null;
+  initialTab?: "exceptions" | "all" | "related" | "credit_cards" | "low" | "unreconciled" | null;
   onComplete: () => void;
   onBack?: () => void;
 };
@@ -46,14 +47,20 @@ function CategorySelect({ currentCategory, onChange }: { currentCategory: string
   );
 }
 
-export default function ReviewStep({ workspace, initialAccountId, onComplete, onBack }: Props) {
+export default function ReviewStep({ workspace, initialAccountId, initialTab, onComplete, onBack }: Props) {
   const [items, setItems] = useState<TransactionWithClassification[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"exceptions" | "all" | "related" | "low">("exceptions");
+  const [activeTab, setActiveTab] = useState<"exceptions" | "all" | "related" | "credit_cards" | "low" | "unreconciled">("exceptions");
   const [filter, setFilter] = useState("");
   const [accountFilter, setAccountFilter] = useState(initialAccountId ?? "");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [statementFilter, setStatementFilter] = useState("");
+  const [minAmount, setMinAmount] = useState("");
+  const [maxAmount, setMaxAmount] = useState("");
+  const [note, setNote] = useState("");
 
   const loadCounts = useCallback(async () => {
     const res = await fetch(`/api/transactions?workspaceId=${workspace.id}`);
@@ -83,14 +90,46 @@ export default function ReviewStep({ workspace, initialAccountId, onComplete, on
     }
   }, [initialAccountId]);
 
-  async function handleAction(action: "approve" | "exclude", transactionIds: string[], newCategory?: string) {
+  useEffect(() => {
+    if (initialTab) setActiveTab(initialTab);
+  }, [initialTab]);
+
+  async function handleAction(action: ReviewAction, transactionIds: string[], newCategory?: string, reviewStatus?: ReviewStatus, correction?: TransactionCorrection) {
     await fetch("/api/classifications", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ transactionIds, action, newCategory }),
+      body: JSON.stringify({ transactionIds, action, newCategory, reviewStatus, note, correction }),
     });
     setSelected(new Set());
-    await load();
+    setNote("");
+    await load(activeTab !== "exceptions");
+  }
+
+  async function correctTransaction(t: TransactionWithClassification) {
+    const date = window.prompt("Correct date (YYYY-MM-DD)", t.date) || undefined;
+    const description = window.prompt("Correct description", t.description) || undefined;
+    const amountText = window.prompt("Correct amount", String(t.amount));
+    const amount = amountText === null || amountText.trim() === "" ? undefined : Number(amountText);
+    await handleAction("correct_transaction", [t.id], undefined, undefined, {
+      date,
+      description,
+      amount: Number.isFinite(amount) ? amount : undefined,
+    });
+  }
+
+  async function createRuleFromTransaction(t: TransactionWithClassification) {
+    if (!t.classification) return;
+    await fetch("/api/classification-rules", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        companyId: workspace.companyId,
+        pattern: t.description,
+        finalCategory: t.classification.finalCategory,
+        direction: t.amount < 0 ? "out" : t.amount > 0 ? "in" : "any",
+        priority: 10,
+      }),
+    });
   }
 
   function toggleSelect(id: string) {
@@ -113,6 +152,11 @@ export default function ReviewStep({ workspace, initialAccountId, onComplete, on
 
   const filtered = items.filter((t) => {
     if (accountFilter && t.bankAccountId !== accountFilter) return false;
+    if (statementFilter && t.statementId !== statementFilter) return false;
+    if (statusFilter && t.classification?.reviewStatus !== statusFilter) return false;
+    if (categoryFilter && t.classification?.finalCategory !== categoryFilter) return false;
+    if (minAmount && t.amount < Number(minAmount)) return false;
+    if (maxAmount && t.amount > Number(maxAmount)) return false;
     if (activeTab === "related") {
       const haystack = `${t.description} ${t.classification?.finalCategory ?? ""} ${t.classification?.ruleUsed ?? ""}`.toLowerCase();
       if (!/(valoris|related party|intercompany|affiliate|due from related|due to related|member distributions)/.test(haystack)) return false;
@@ -120,6 +164,11 @@ export default function ReviewStep({ workspace, initialAccountId, onComplete, on
     if (activeTab === "low") {
       if (!["low", "medium"].includes(t.classification?.confidence ?? "")) return false;
     }
+    if (activeTab === "credit_cards") {
+      const haystack = `${t.description} ${t.classification?.finalCategory ?? ""} ${t.classification?.reviewStatus ?? ""}`.toLowerCase();
+      if (!/(credit card|card statements|card payable|amex|citi|autopay)/.test(haystack)) return false;
+    }
+    if (activeTab === "unreconciled" && !accountFilter) return false;
     if (!filter) return true;
     const q = filter.toLowerCase();
     return t.description.toLowerCase().includes(q) || (t.classification?.finalCategory ?? "").toLowerCase().includes(q);
@@ -128,6 +177,15 @@ export default function ReviewStep({ workspace, initialAccountId, onComplete, on
   const itemsNeedingReview = items.filter((t) => requiresReview(t.classification));
   const pendingCount = itemsNeedingReview.length;
   const allResolved = itemsNeedingReview.length === 0;
+  const accountTotals = filtered.reduce((acc, t) => {
+    acc.count += 1;
+    acc.total += t.amount;
+    if (t.balance !== null && t.balance !== undefined) acc.lastBalance = t.balance;
+    return acc;
+  }, { count: 0, total: 0, lastBalance: null as number | null });
+  const accountOptions = Array.from(new Map(items.map((t: any) => [t.bankAccountId, t.accountName ? `${t.accountName} (${t.bankName ?? ""} ${t.lastFour ?? ""})` : t.bankAccountId])).entries());
+  const statementOptions = Array.from(new Set(items.map((t) => t.statementId)));
+  const categoryOptions = Array.from(new Set(items.map((t) => t.classification?.finalCategory).filter(Boolean))) as string[];
 
   if (loading) return <p className="text-sm text-slate-500">Loading transactions...</p>;
 
@@ -155,15 +213,27 @@ export default function ReviewStep({ workspace, initialAccountId, onComplete, on
             Related Parties
           </button>
           <button
+            onClick={() => setActiveTab("credit_cards")}
+            className={`text-sm px-3 py-1 rounded ${activeTab === "credit_cards" ? "bg-ink text-white" : "text-slate-500 hover:text-ink"}`}
+          >
+            Credit Cards
+          </button>
+          <button
             onClick={() => setActiveTab("low")}
             className={`text-sm px-3 py-1 rounded ${activeTab === "low" ? "bg-ink text-white" : "text-slate-500 hover:text-ink"}`}
           >
             Low Confidence
           </button>
+          <button
+            onClick={() => setActiveTab("unreconciled")}
+            className={`text-sm px-3 py-1 rounded ${activeTab === "unreconciled" ? "bg-ink text-white" : "text-slate-500 hover:text-ink"}`}
+          >
+            Unreconciled Account
+          </button>
         </div>
       </div>
 
-      {allResolved ? (
+      {allResolved && activeTab === "exceptions" ? (
         <div className="rounded border border-sage/30 bg-sage/5 p-6 text-center">
           <p className="text-sage font-medium">No exceptions. All transactions are classified.</p>
           <p className="mt-1 text-sm text-slate-500">You can proceed to results.</p>
@@ -177,12 +247,29 @@ export default function ReviewStep({ workspace, initialAccountId, onComplete, on
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
             />
-            <input
-              className="w-48 rounded border border-line px-3 py-2 text-sm"
-              placeholder="Account ID filter"
+            <select
+              className="w-56 rounded border border-line px-3 py-2 text-sm"
               value={accountFilter}
               onChange={(e) => setAccountFilter(e.target.value)}
-            />
+            >
+              <option value="">All accounts</option>
+              {accountOptions.map(([id, label]) => <option key={id} value={id}>{label}</option>)}
+            </select>
+            <select className="w-44 rounded border border-line px-3 py-2 text-sm" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="">All statuses</option>
+              {["pending", "approved", "excluded", "support_needed", "cpa_review", "card_statements_needed"].map((status) => <option key={status} value={status}>{status}</option>)}
+            </select>
+            <select className="w-52 rounded border border-line px-3 py-2 text-sm" value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+              <option value="">All categories</option>
+              {categoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
+            </select>
+            <select className="w-44 rounded border border-line px-3 py-2 text-sm" value={statementFilter} onChange={(e) => setStatementFilter(e.target.value)}>
+              <option value="">All statements</option>
+              {statementOptions.map((id) => <option key={id} value={id}>{id.slice(0, 8)}</option>)}
+            </select>
+            <input className="w-28 rounded border border-line px-3 py-2 text-sm" placeholder="Min $" value={minAmount} onChange={(e) => setMinAmount(e.target.value)} />
+            <input className="w-28 rounded border border-line px-3 py-2 text-sm" placeholder="Max $" value={maxAmount} onChange={(e) => setMaxAmount(e.target.value)} />
+            <input className="min-w-[220px] flex-1 rounded border border-line px-3 py-2 text-sm" placeholder="Review note" value={note} onChange={(e) => setNote(e.target.value)} />
             {accountFilter && (
               <button onClick={() => setAccountFilter("")} className="text-xs text-slate-500 underline">Clear account</button>
             )}
@@ -202,9 +289,26 @@ export default function ReviewStep({ workspace, initialAccountId, onComplete, on
                 >
                   Exclude ({selected.size})
                 </button>
+                <button onClick={() => handleAction("mark_cpa_review", Array.from(selected))} className="rounded border border-line px-3 py-1.5 text-xs">
+                  CPA Review ({selected.size})
+                </button>
+                <button onClick={() => handleAction("mark_support_needed", Array.from(selected))} className="rounded border border-line px-3 py-1.5 text-xs">
+                  Support Needed ({selected.size})
+                </button>
               </>
             )}
           </div>
+
+          {accountFilter && (
+            <div className="rounded border border-line bg-paper p-3 text-sm">
+              <p className="font-medium">Account Activity</p>
+              <div className="mt-1 flex flex-wrap gap-4 text-xs text-slate-600">
+                <span>Transactions: {accountTotals.count}</span>
+                <span>Filtered movement: ${accountTotals.total.toFixed(2)}</span>
+                <span>Last running balance: {accountTotals.lastBalance === null ? "Not available" : `$${accountTotals.lastBalance.toFixed(2)}`}</span>
+              </div>
+            </div>
+          )}
 
           <div className="overflow-x-auto">
             <table className="w-full min-w-[720px] border-collapse text-sm">
@@ -278,6 +382,30 @@ export default function ReviewStep({ workspace, initialAccountId, onComplete, on
                             className="rounded border border-line px-2 py-1 text-xs text-slate-500"
                           >
                             Exclude
+                          </button>
+                          <button
+                            onClick={() => handleAction("mark_cpa_review", [t.id])}
+                            className="rounded border border-line px-2 py-1 text-xs text-brass"
+                          >
+                            CPA
+                          </button>
+                          <button
+                            onClick={() => handleAction("mark_support_needed", [t.id])}
+                            className="rounded border border-line px-2 py-1 text-xs text-slate-500"
+                          >
+                            Support
+                          </button>
+                          <button
+                            onClick={() => createRuleFromTransaction(t)}
+                            className="rounded border border-line px-2 py-1 text-xs text-slate-500"
+                          >
+                            Save rule
+                          </button>
+                          <button
+                            onClick={() => correctTransaction(t)}
+                            className="rounded border border-line px-2 py-1 text-xs text-slate-500"
+                          >
+                            Correct
                           </button>
                         </div>
                       </td>

@@ -1,8 +1,10 @@
 import { classifyTransaction } from "./classification";
+import { applyCompanyClassificationRules } from "./classificationRules";
 import { CATEGORY_OPTIONS } from "./categoryOptions";
 import { importStatementRows } from "./statementImport";
 import type {
   Classification,
+  CompanyClassificationRule,
   ColumnMapping,
   PreclassificationOverride,
   PreclassificationResult,
@@ -15,7 +17,8 @@ export function preclassifyImportRows(
   mapping: ColumnMapping,
   workspaceId: string,
   bankAccountId: string,
-  taxYear: number
+  taxYear: number,
+  companyRules: CompanyClassificationRule[] = []
 ): PreclassificationResult {
   const { rows, errors } = importStatementRows(data, fileName, mapping, workspaceId, bankAccountId, taxYear);
 
@@ -33,7 +36,11 @@ export function preclassifyImportRows(
       createdAt: new Date().toISOString(),
     };
 
-    const proposedClassification = classifyTransaction(transactionForClassification);
+    const proposedClassification = applyCompanyClassificationRules(
+      classifyTransaction(transactionForClassification),
+      transactionForClassification,
+      companyRules
+    );
 
     return {
       ...row,

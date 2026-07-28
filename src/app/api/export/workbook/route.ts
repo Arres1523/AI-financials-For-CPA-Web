@@ -108,6 +108,14 @@ export async function POST(request: Request) {
       ORDER BY uploaded_at ASC
     `, [body.workspaceId, user.id]);
 
+    const reviewRows = await query(`
+      SELECT re.transaction_id, re.action, re.previous_category, re.new_category, re.previous_status, re.new_status, re.note, re.created_at
+      FROM review_events re
+      JOIN transactions t ON t.id = re.transaction_id
+      WHERE t.workspace_id = $1 AND re.user_id = $2
+      ORDER BY re.created_at ASC
+    `, [body.workspaceId, user.id]);
+
     const buffer = await buildWorkbookBuffer({
       companyName,
       taxYear,
@@ -122,6 +130,16 @@ export async function POST(request: Request) {
         sourceName: row.source_name,
         importedRows: row.imported_rows,
         uploadedAt: row.uploaded_at,
+      })),
+      reviewEvents: reviewRows.map((row: any) => ({
+        transactionId: row.transaction_id,
+        action: row.action,
+        previousCategory: row.previous_category,
+        newCategory: row.new_category,
+        previousStatus: row.previous_status,
+        newStatus: row.new_status,
+        note: row.note,
+        createdAt: row.created_at,
       })),
       includeTransactions: body.includeTransactions ?? false,
     });

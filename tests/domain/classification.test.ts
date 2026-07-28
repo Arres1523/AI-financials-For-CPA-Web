@@ -35,6 +35,12 @@ describe("classifyTransaction", () => {
     expect(c.reviewStatus).toBe("cpa_review");
   });
 
+  it("keeps partner transfers off automatic approval", () => {
+    const c = classifyTransaction(tx("TRANSFER TO PARTNER DISTRIBUTION", -2500));
+    expect(c.reportType).toBe("Balance Sheet");
+    expect(c.reviewStatus).toBe("cpa_review");
+  });
+
   it("classifies rental income as P&L", () => {
     const c = classifyTransaction(tx("RENTAL INCOME January", 12000));
     expect(c.reportType).toBe("P&L");

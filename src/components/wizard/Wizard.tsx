@@ -20,6 +20,7 @@ export default function Wizard() {
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [reconciliation, setReconciliation] = useState<ReconciliationResult[]>([]);
   const [reviewAccountId, setReviewAccountId] = useState<string | null>(null);
+  const [reviewTab, setReviewTab] = useState<"exceptions" | "all" | "related" | "credit_cards" | "low" | "unreconciled" | null>(null);
 
   const steps = [
     { id: 1 as StepId, label: "Company & Year" },
@@ -56,6 +57,7 @@ export default function Wizard() {
 
   function handleUploadComplete() {
     setReviewAccountId(null);
+    setReviewTab(null);
     setStep(4);
   }
 
@@ -70,6 +72,13 @@ export default function Wizard() {
 
   function handleReviewAccount(accountId: string) {
     setReviewAccountId(accountId);
+    setReviewTab("unreconciled");
+    setStep(4);
+  }
+
+  function handleReviewPreset(tab: "exceptions" | "all" | "related" | "credit_cards" | "low" | "unreconciled", accountId?: string) {
+    setReviewTab(tab);
+    setReviewAccountId(accountId ?? null);
     setStep(4);
   }
 
@@ -102,7 +111,7 @@ export default function Wizard() {
           <UploadStep workspace={workspace} accounts={accounts} onComplete={handleUploadComplete} />
         )}
         {step === 4 && workspace && (
-          <ReviewStep workspace={workspace} initialAccountId={reviewAccountId} onComplete={handleReviewComplete} onBack={() => setStep(3)} />
+          <ReviewStep workspace={workspace} initialAccountId={reviewAccountId} initialTab={reviewTab} onComplete={handleReviewComplete} onBack={() => setStep(3)} />
         )}
         {step === 5 && workspace && accounts.length > 0 && (
           <ReconciliationStep
@@ -120,6 +129,7 @@ export default function Wizard() {
             accounts={accounts}
             reconciliation={reconciliation}
             onNewWorkflow={handleNewWorkflow}
+            onReviewPreset={handleReviewPreset}
           />
         )}
       </div>

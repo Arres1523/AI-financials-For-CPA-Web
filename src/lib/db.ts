@@ -141,6 +141,11 @@ const MIGRATIONS: [string, string][] = [
     );
     CREATE INDEX IF NOT EXISTS idx_opening_balance_entries_workspace ON opening_balance_entries(workspace_id);
   `],
+  ["v5_statement_source_metadata", `
+    ALTER TABLE uploaded_statements ADD COLUMN IF NOT EXISTS file_type TEXT DEFAULT 'xlsx';
+    ALTER TABLE uploaded_statements ADD COLUMN IF NOT EXISTS source_name TEXT;
+    ALTER TABLE uploaded_statements ADD COLUMN IF NOT EXISTS parser_version TEXT DEFAULT 'statement-import-v2';
+  `],
 ];
 
 async function initialize(): Promise<void> {

@@ -74,6 +74,24 @@ describe("buildWorkbookBuffer", () => {
     expect(names).toContain("Transaction History");
   });
 
+  it("includes imported statement file metadata when provided", async () => {
+    const workbook = await buildAndLoad({
+      ...minimalInput,
+      statementFiles: [{
+        fileName: "jan.csv",
+        fileType: "csv",
+        sourceName: "jan.csv",
+        importedRows: 25,
+        uploadedAt: "2026-01-02T00:00:00.000Z",
+      }],
+    });
+    const sheet = workbook.getWorksheet("Statement Files")!;
+    expect(sheet).toBeDefined();
+    expect(sheet.getCell("A2").value).toBe("jan.csv");
+    expect(sheet.getCell("B2").value).toBe("CSV");
+    expect(sheet.getCell("D2").value).toBe(25);
+  });
+
   it("sets P&L column widths", async () => {
     const workbook = await buildAndLoad();
     const pnl = workbook.getWorksheet(`P&L 2025`)!;

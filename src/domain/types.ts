@@ -37,6 +37,8 @@ export type UploadedStatement = {
   bankAccountId: string;
   fileName: string;
   sheetName: string | null;
+  fileType?: StatementFileType;
+  sourceName?: string | null;
   totalRows: number;
   importedRows: number;
   uploadedAt: string;
@@ -121,6 +123,8 @@ export type XlsxImportRow = {
   balance: number | null;
   rowIndex: number;
   sheetName?: string;
+  fileType?: StatementFileType;
+  sourceName?: string;
 };
 
 export type GlobalClassifierSuggestion = {
@@ -283,14 +287,20 @@ export type ColumnMapping = {
   date: string;
   description: string;
   payee?: string;
+  merchantCategory?: string;
+  transactionType?: string;
   amount?: string;
   debit?: string;
   credit?: string;
   balance?: string;
 };
 
+export type StatementFileType = "xlsx" | "csv" | "pdf";
+
 export type UploadPreview = {
   fileName: string;
+  fileType?: StatementFileType;
+  sourceName?: string | null;
   sheetName: string | null;
   totalRows: number;
   sampleRows: Record<string, string>[];
@@ -298,6 +308,7 @@ export type UploadPreview = {
   detectedMapping: Partial<ColumnMapping>;
   confidence: "high" | "medium" | "low";
   errors: string[];
+  warnings?: string[];
 };
 
 export type ImportError = {

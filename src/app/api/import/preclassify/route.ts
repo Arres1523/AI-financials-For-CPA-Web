@@ -16,6 +16,8 @@ const mappingSchema = z.object({
   date: z.string().min(1, "Date column required"),
   description: z.string().min(1, "Description column required"),
   payee: z.string().optional(),
+  merchantCategory: z.string().optional(),
+  transactionType: z.string().optional(),
   amount: z.string().optional(),
   debit: z.string().optional(),
   credit: z.string().optional(),

@@ -60,6 +60,25 @@ describe("classifyTransaction", () => {
     expect(c.finalCategory).toBe("Utilities");
   });
 
+  it("classifies fuel merchant details as other expense", () => {
+    const c = classifyTransaction(tx("SHELL SERVICE STATION | merchant category: fuel", -72.14));
+    expect(c.reportType).toBe("P&L");
+    expect(c.finalCategory).toBe("Other Expense");
+    expect(c.reviewStatus).toBe("approved");
+  });
+
+  it("classifies telecom merchant details as utilities", () => {
+    const c = classifyTransaction(tx("T MOBILE | merchant category: telecom communications", -89.99));
+    expect(c.reportType).toBe("P&L");
+    expect(c.finalCategory).toBe("Utilities");
+  });
+
+  it("classifies software subscriptions as other expense", () => {
+    const c = classifyTransaction(tx("ZOOM.US SOFTWARE SUBSCRIPTION", -15.99));
+    expect(c.reportType).toBe("P&L");
+    expect(c.finalCategory).toBe("Other Expense");
+  });
+
   it("flags capital improvements for support needed", () => {
     const c = classifyTransaction(tx("ROOF REPAIR CAPITAL IMPROVEMENT", -5000));
     expect(c.finalCategory).toBe("Capital Improvements");

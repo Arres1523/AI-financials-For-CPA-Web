@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { query, queryOne, withTransaction } from "@/lib/db";
 import { v4 as uuid } from "uuid";
-import { importRows, hashFile } from "@/domain/importXlsx";
+import { hashFile } from "@/domain/importXlsx";
+import { detectStatementFileType, importStatementRows } from "@/domain/statementImport";
 import type { ColumnMapping, PreclassificationOverride } from "@/domain/types";
 import { classifyTransaction } from "@/domain/classification";
 import { applyPreclassificationOverride } from "@/domain/importPreclassification";
@@ -14,6 +15,8 @@ const mappingSchema = z.object({
   date: z.string().min(1, "Date column required"),
   description: z.string().min(1, "Description column required"),
   payee: z.string().optional(),
+  merchantCategory: z.string().optional(),
+  transactionType: z.string().optional(),
   amount: z.string().optional(),
   debit: z.string().optional(),
   credit: z.string().optional(),
@@ -66,6 +69,10 @@ export async function POST(request: Request) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const fileName = file.name;
+    const fileType = detectStatementFileType(fileName);
+    if (!fileType) {
+      return NextResponse.json({ error: "Only .csv, .xlsx, and text-based .pdf files are accepted" }, { status: 400 });
+    }
     const fileHash = hashFile(buffer);
 
     const existingStmt = await queryOne(
@@ -81,7 +88,7 @@ export async function POST(request: Request) {
       }, { status: 409 });
     }
 
-    const { rows, errors: importErrors } = importRows(buffer, fileName, mapping, workspaceId, bankAccountId, taxYear);
+    const { rows, errors: importErrors } = importStatementRows(buffer, fileName, mapping, workspaceId, bankAccountId, taxYear);
 
     if (rows.length === 0) {
       return NextResponse.json({ imported: 0, statementId: null, errors: importErrors }, { status: 422 });
@@ -91,8 +98,8 @@ export async function POST(request: Request) {
 
     const imported = await withTransaction(async (client) => {
       await client.query(
-        "INSERT INTO uploaded_statements (id, workspace_id, bank_account_id, file_name, sheet_name, total_rows, imported_rows, file_hash, user_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
-        [statementId, workspaceId, bankAccountId, fileName, rows[0]?.sheetName || null, rows.length, rows.length, fileHash, user.id]
+        "INSERT INTO uploaded_statements (id, workspace_id, bank_account_id, file_name, sheet_name, total_rows, imported_rows, file_hash, user_id, file_type, source_name, parser_version) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
+        [statementId, workspaceId, bankAccountId, fileName, rows[0]?.sheetName || null, rows.length, rows.length, fileHash, user.id, fileType, rows[0]?.sourceName || rows[0]?.sheetName || null, "statement-import-v2"]
       );
 
       let count = 0;

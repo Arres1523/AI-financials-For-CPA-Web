@@ -12,6 +12,9 @@ type Props = {
 const FIELDS: { key: keyof ColumnMapping; label: string; required: boolean }[] = [
   { key: "date" as const, label: "Date", required: true },
   { key: "description" as const, label: "Description", required: true },
+  { key: "payee" as const, label: "Payee / Vendor", required: false },
+  { key: "merchantCategory" as const, label: "Merchant Category", required: false },
+  { key: "transactionType" as const, label: "Transaction Type", required: false },
   { key: "amount" as const, label: "Amount (single column)", required: false },
   { key: "debit" as const, label: "Debit (if separate)", required: false },
   { key: "credit" as const, label: "Credit (if separate)", required: false },
@@ -22,6 +25,9 @@ export default function ColumnMapper({ columns, detected, onChange }: Props) {
   const current: ColumnMapping = {
     date: detected.date || columns[0] || "",
     description: detected.description || columns[1] || "",
+    payee: detected.payee,
+    merchantCategory: detected.merchantCategory,
+    transactionType: detected.transactionType,
     amount: detected.amount || "",
     debit: detected.debit,
     credit: detected.credit,
@@ -39,6 +45,13 @@ export default function ColumnMapper({ columns, detected, onChange }: Props) {
   return (
     <div className="space-y-3">
       <p className="text-sm font-medium">Column Mapping: match each field to a column</p>
+      <div className="flex flex-wrap gap-2 text-xs">
+        {FIELDS.filter(({ key }) => current[key]).map(({ key, label }) => (
+          <span key={key} className="rounded border border-sage/30 bg-sage/10 px-2 py-1 text-sage">
+            {label}: {current[key]}
+          </span>
+        ))}
+      </div>
       <div className="grid grid-cols-[1fr_2fr] gap-2 text-sm">
         {FIELDS.map(({ key, label, required }) => {
           if (key === "debit" || key === "credit") {
@@ -52,7 +65,7 @@ export default function ColumnMapper({ columns, detected, onChange }: Props) {
                 {required && <span className="text-red-500">*</span>}
               </label>
               <select
-                className="rounded border border-line px-3 py-1.5 text-sm"
+                className={`rounded border px-3 py-1.5 text-sm ${current[key] ? "border-sage bg-sage/5" : "border-line"}`}
                 value={current[key] || ""}
                 onChange={(e) => update(key, e.target.value)}
               >

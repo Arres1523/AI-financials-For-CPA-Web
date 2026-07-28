@@ -58,8 +58,8 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
     setImportStatus("idle");
 
     for (const file of Array.from(files)) {
-      if (!file.name.toLowerCase().endsWith(".xlsx")) {
-        setFileError(`"${file.name}" is not an .xlsx file. Only .xlsx files are accepted.`);
+      if (!/\.(csv|xlsx|pdf)$/i.test(file.name)) {
+        setFileError(`"${file.name}" is not supported. Upload CSV, XLSX, or text-based PDF statements.`);
         continue;
       }
 
@@ -93,7 +93,7 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
     if (!buffer) return null;
 
     const formData = new FormData();
-    const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const blob = new Blob([buffer], { type: preview.fileType === "csv" ? "text/csv" : preview.fileType === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     formData.append("file", blob, preview.fileName);
     formData.append("workspaceId", workspace.id);
     formData.append("bankAccountId", selectedAccount);
@@ -255,12 +255,12 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
         <input
           ref={fileRef}
           type="file"
-          accept=".xlsx"
+          accept=".csv,.xlsx,.pdf"
           multiple
           onChange={handleFileSelectWithBuffer}
           className="block w-full text-sm file:mr-4 file:rounded file:border-0 file:bg-ink file:px-4 file:py-2 file:text-sm file:text-white hover:file:opacity-90"
         />
-        <p className="mt-2 text-xs text-slate-400">Accepts .xlsx files only, multiple files allowed</p>
+        <p className="mt-2 text-xs text-slate-400">Accepts CSV, XLSX, and text-based PDF files. Multiple files allowed.</p>
       </div>}
 
       {/* Loading persisted statements */}
@@ -284,7 +284,10 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
           <ul className="mt-2 space-y-1">
             {persistedStatements.map((s) => (
               <li key={s.id} className="text-sm text-slate-600">
-                {s.fileName}: {s.importedRows} transaction{s.importedRows !== 1 ? "s" : ""}
+                {s.fileName}
+                {s.fileType ? ` (${s.fileType.toUpperCase()})` : ""}
+                {s.sourceName ? ` — ${s.sourceName}` : ""}
+                : {s.importedRows} transaction{s.importedRows !== 1 ? "s" : ""}
               </li>
             ))}
           </ul>
@@ -323,6 +326,7 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
               <p className="font-medium">{preview.fileName}</p>
               <p className="text-xs text-slate-500">
                 {preview.sheetName && `Sheet: ${preview.sheetName}. `}
+                {preview.fileType && `${preview.fileType.toUpperCase()}. `}
                 {preview.totalRows} rows
                 {preview.confidence === "high" ? ". Auto-detected" : preview.confidence === "medium" ? ". Partial detection" : ". Needs mapping"}
               </p>
@@ -346,6 +350,12 @@ export default function UploadStep({ workspace, accounts, onComplete }: Props) {
           {preview.errors.length > 0 && (
             <div className="rounded bg-red-50 p-3 text-sm text-red-700">
               {preview.errors.map((err: string, i: number) => <p key={i}>{err}</p>)}
+            </div>
+          )}
+
+          {(preview.warnings ?? []).length > 0 && (
+            <div className="rounded bg-brass/10 p-3 text-sm text-brass">
+              {(preview.warnings ?? []).map((warning: string, i: number) => <p key={i}>{warning}</p>)}
             </div>
           )}
 

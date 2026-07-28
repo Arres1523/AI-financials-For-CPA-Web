@@ -150,7 +150,7 @@ export function classifyTransaction(transaction: Transaction): Classification {
   }
 
   // P&L — Utilities
-  if (has(text, [/UTILITY/, /ELECTRIC/, /POWER CO/, /GAS CO/, /WATER/, /SEWER/, /TRASH/, /PG&E/, /LADWP/])) {
+  if (has(text, [/UTILITY/, /ELECTRIC/, /POWER CO/, /GAS CO/, /WATER/, /SEWER/, /TRASH/, /PG&E/, /LADWP/, /TELECOM/, /COMMUNICATIONS/, /\bMOBILE\b/, /\bT-?MOBILE\b/, /\bVERIZON\b/, /\bAT&T\b/])) {
     return HIGH(transaction.id, "Utilities", "P&L", "Utility bill pattern");
   }
 
@@ -190,8 +190,11 @@ export function classifyTransaction(transaction: Transaction): Classification {
   }
 
   // P&L — Other Expense
-  if (has(text, [/SUPPLIES/, /POSTAGE/, /PRINTING/, /ADVERTISING/, /MARKETING/, /SOFTWARE/, /SUBSCRIPTION/, /DUES/])) {
-    return MEDIUM(transaction.id, "Other Expense", "P&L", "Other operating expense pattern");
+  if (has(text, [/SUPPLIES/, /POSTAGE/, /PRINTING/, /ADVERTISING/, /MARKETING/, /SOFTWARE/, /SUBSCRIPTION/, /DUES/, /\bFUEL\b/, /GAS STATION/, /SERVICE STATION/, /\bSHELL\b/, /\bCHEVRON\b/, /\bEXXON\b/, /\bBP\b/])) {
+    const rule = has(text, [/\bFUEL\b/, /GAS STATION/, /SERVICE STATION/, /\bSHELL\b/, /\bCHEVRON\b/, /\bEXXON\b/, /\bBP\b/])
+      ? "Fuel / station merchant detail"
+      : "Other operating expense pattern";
+    return HIGH(transaction.id, "Other Expense", "P&L", rule);
   }
 
   // K-1 / Tax items → CPA review

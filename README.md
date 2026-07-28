@@ -1,6 +1,6 @@
 # AI Financials for CPA Web
 
-Annual financial workflow MVP for CPAs. Processes XLSX bank statements, auto-classifies transactions, supports review/reconciliation, exports P&L, Balance Sheet, Cash Rollforward, and CPA Memo — with email delivery via Resend.
+Annual financial workflow MVP for CPAs. Processes CSV, XLSX, and text-based PDF bank statements, auto-classifies transactions, supports review/reconciliation, exports P&L, Balance Sheet, Cash Rollforward, and CPA Memo — with email delivery via Resend.
 
 ## Prerequisites
 
@@ -98,6 +98,7 @@ If registration fails in production:
 ## Features
 
 - **Multi-step wizard**: Company setup → bank accounts → upload/import → preclassification review → classification review → reconciliation
+- **Multi-format statement import**: CSV, XLSX, and best-effort text-based PDF parsing with column mapping and review warnings
 - **Deterministic classification**: Rule-based (regex) — no AI costs, no data sent externally
 - **Transfer matching**: Auto-detect internal transfers between accounts, exclude from P&L
 - **Suspense tracking**: Transactions needing review block "complete" report mode
@@ -115,7 +116,7 @@ If registration fails in production:
 1. Open `http://localhost:3000`.
 2. Create a company and select fiscal year.
 3. Add bank account(s) with opening/closing balances.
-4. Upload `.xlsx` statement (first sheet only).
+4. Upload `.csv`, `.xlsx`, or text-based `.pdf` statements.
 5. Review preclassification, approve or adjust categories.
 6. Check reconciliation status and suspense items.
 7. Export Financial Statements or CPA Memo, optionally emailed to recipients.
@@ -125,7 +126,7 @@ If registration fails in production:
 - **Frontend**: Next.js 15 (App Router), React 19, Tailwind CSS
 - **Backend**: Next.js API routes, Postgres via `pg` (Supabase compatible)
 - **Auth**: Supabase Auth; server-side registration via Admin Auth; browser sessions via `@supabase/ssr`
-- **Import**: `xlsx` (SheetJS), first-sheet-only, deterministic classification with preclassification review
+- **Import**: CSV (PapaParse), XLSX (SheetJS), text-based PDF best-effort extraction, deterministic classification with preclassification review
 - **Export**: ExcelJS — P&L, Balance Sheet, Cash Rollforward, Transaction History (12 audit columns); docx — CPA Memo
 - **Email**: Resend SDK — welcome emails, report delivery with attachments
 - **Testing**: Vitest (unit), Playwright (E2E)
@@ -133,6 +134,7 @@ If registration fails in production:
 ## MVP Boundaries
 
 - First worksheet only per XLSX file — subsequent sheets are ignored with a warning.
+- PDF import supports text-based PDFs only. Scanned PDFs require conversion to CSV/XLSX or a future OCR workflow.
 - Strict fiscal year — only transactions within the selected year are accepted.
 - No external AI inference — classification is rule-based.
 - Balance Sheet is explicitly preliminary — based on classified bank activity, not full accounting records.

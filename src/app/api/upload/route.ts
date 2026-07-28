@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { buildPreview } from "@/domain/importXlsx";
+import { buildStatementPreview, detectStatementFileType } from "@/domain/statementImport";
 import { requireUser, UnauthorizedError } from "@/lib/require-user";
 
 export const runtime = "nodejs";
@@ -18,13 +18,13 @@ export async function POST(request: Request) {
     if (!file) return NextResponse.json({ error: "No file provided" }, { status: 400 });
 
     const fileName = file.name;
-    if (!fileName.toLowerCase().endsWith(".xlsx")) {
-      return NextResponse.json({ error: "Only .xlsx files are accepted" }, { status: 400 });
+    if (!detectStatementFileType(fileName)) {
+      return NextResponse.json({ error: "Only .csv, .xlsx, and text-based .pdf files are accepted" }, { status: 400 });
     }
 
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-    const preview = buildPreview(buffer, fileName);
+    const preview = buildStatementPreview(buffer, fileName);
     return NextResponse.json(preview);
   } catch (e) {
     if (e instanceof UnauthorizedError) {

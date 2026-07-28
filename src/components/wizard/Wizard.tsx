@@ -19,6 +19,7 @@ export default function Wizard() {
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [accounts, setAccounts] = useState<BankAccount[]>([]);
   const [reconciliation, setReconciliation] = useState<ReconciliationResult[]>([]);
+  const [reviewAccountId, setReviewAccountId] = useState<string | null>(null);
 
   const steps = [
     { id: 1 as StepId, label: "Company & Year" },
@@ -38,7 +39,8 @@ export default function Wizard() {
   }, [step, steps]);
 
   function goTo(s: StepId) {
-    if (s < step) setStep(s);
+    const target = steps.find((item) => item.id === s);
+    if (target && stepStatus(s) !== "pending") setStep(s);
   }
 
   function handleCompanyComplete(c: Company, ws: Workspace) {
@@ -53,6 +55,7 @@ export default function Wizard() {
   }
 
   function handleUploadComplete() {
+    setReviewAccountId(null);
     setStep(4);
   }
 
@@ -63,6 +66,11 @@ export default function Wizard() {
   function handleReconComplete(results: ReconciliationResult[]) {
     setReconciliation(results);
     setStep(6);
+  }
+
+  function handleReviewAccount(accountId: string) {
+    setReviewAccountId(accountId);
+    setStep(4);
   }
 
   function handleNewWorkflow() {
@@ -85,7 +93,7 @@ export default function Wizard() {
         <p className="text-xs text-slate-500">Step {step} of {steps.length}</p>
       </div>
 
-      <StepIndicator steps={steps.map((s) => ({ ...s, status: stepStatus(s.id) }))} />
+      <StepIndicator steps={steps.map((s) => ({ ...s, status: stepStatus(s.id) }))} onStepClick={(id) => goTo(id as StepId)} />
 
       <div className="border border-line bg-white p-4 md:p-5">
         {step === 1 && <CompanyStep onComplete={handleCompanyComplete} />}
@@ -94,7 +102,7 @@ export default function Wizard() {
           <UploadStep workspace={workspace} accounts={accounts} onComplete={handleUploadComplete} />
         )}
         {step === 4 && workspace && (
-          <ReviewStep workspace={workspace} onComplete={handleReviewComplete} onBack={() => setStep(3)} />
+          <ReviewStep workspace={workspace} initialAccountId={reviewAccountId} onComplete={handleReviewComplete} onBack={() => setStep(3)} />
         )}
         {step === 5 && workspace && accounts.length > 0 && (
           <ReconciliationStep
@@ -102,6 +110,7 @@ export default function Wizard() {
             accounts={accounts}
             onComplete={handleReconComplete}
             onBack={() => setStep(4)}
+            onReviewAccount={handleReviewAccount}
           />
         )}
         {step === 6 && company && workspace && (

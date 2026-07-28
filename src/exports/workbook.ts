@@ -37,6 +37,7 @@ export type WorkbookExportInput = {
   reports: FinancialReport;
   flaggedTransactions: Transaction[];
   accountReconData: { id: string; account_name: string; opening_balance: number; closing_balance: number; movement_total: number }[];
+  statementFiles?: { fileName: string; fileType?: string | null; sourceName?: string | null; importedRows: number; uploadedAt: string }[];
   includeTransactions: boolean;
 };
 
@@ -77,6 +78,28 @@ export async function buildWorkbookBuffer(input: WorkbookExportInput): Promise<B
   statusSheet.addRow(["Opening Balances", input.reports.accountingEquation.missingInputs.includes("Opening Balance Sheet not provided") ? "Missing" : "Provided", "Required for Balance Sheet", "", input.reports.accountingEquation.missingInputs.includes("Opening Balance Sheet not provided") ? "✕" : "✓"]);
 
   statusSheet.addRow(["Credit Card Statements", input.reports.accountingEquation.missingInputs.includes("Credit card statements not imported") ? "Missing" : "Provided", "Required for P&L detail", "", input.reports.accountingEquation.missingInputs.includes("Credit card statements not imported") ? "✕" : "✓"]);
+
+  // ─── Imported Statement Files ───────────────────────────────
+  if (input.statementFiles && input.statementFiles.length > 0) {
+    const files = workbook.addWorksheet("Statement Files", { views: [{ state: "frozen", xSplit: 0, ySplit: 1 }] });
+    files.columns = [
+      { header: "File Name", key: "fileName", width: 42 },
+      { header: "Format", key: "fileType", width: 12 },
+      { header: "Source", key: "sourceName", width: 28 },
+      { header: "Imported Rows", key: "importedRows", width: 16 },
+      { header: "Uploaded At", key: "uploadedAt", width: 24 },
+    ];
+    files.getRow(1).font = { bold: true };
+    for (const file of input.statementFiles) {
+      files.addRow({
+        fileName: file.fileName,
+        fileType: file.fileType ? file.fileType.toUpperCase() : "",
+        sourceName: file.sourceName ?? "",
+        importedRows: file.importedRows,
+        uploadedAt: file.uploadedAt,
+      });
+    }
+  }
 
   // ─── P&L Sheet ──────────────────────────────────────────────
   const pnl = workbook.addWorksheet(`P&L ${input.taxYear}`, { views: [{ showGridLines: false }] });

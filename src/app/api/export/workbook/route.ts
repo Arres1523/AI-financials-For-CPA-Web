@@ -101,6 +101,13 @@ export async function POST(request: Request) {
       GROUP BY a.id
     `, [body.workspaceId, user.id, body.workspaceId, user.id]);
 
+    const statementRows = await query(`
+      SELECT file_name, file_type, source_name, imported_rows, uploaded_at
+      FROM uploaded_statements
+      WHERE workspace_id = $1 AND user_id = $2
+      ORDER BY uploaded_at ASC
+    `, [body.workspaceId, user.id]);
+
     const buffer = await buildWorkbookBuffer({
       companyName,
       taxYear,
@@ -109,6 +116,13 @@ export async function POST(request: Request) {
       reports,
       flaggedTransactions,
       accountReconData,
+      statementFiles: statementRows.map((row: any) => ({
+        fileName: row.file_name,
+        fileType: row.file_type,
+        sourceName: row.source_name,
+        importedRows: row.imported_rows,
+        uploadedAt: row.uploaded_at,
+      })),
       includeTransactions: body.includeTransactions ?? false,
     });
 

@@ -10,9 +10,10 @@ type Props = {
   accounts: BankAccount[];
   onComplete: (results: ReconciliationResult[]) => void;
   onBack?: () => void;
+  onReviewAccount?: (accountId: string) => void;
 };
 
-export default function ReconciliationStep({ workspace, accounts, onComplete, onBack }: Props) {
+export default function ReconciliationStep({ workspace, accounts, onComplete, onBack, onReviewAccount }: Props) {
   const [results, setResults] = useState<ReconciliationResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [openingEntries, setOpeningEntries] = useState<Array<{accountName: string; accountType: string; amount: number}>>([]);
@@ -128,6 +129,7 @@ export default function ReconciliationStep({ workspace, accounts, onComplete, on
               <th className="px-3 py-2">Closing</th>
               <th className="px-3 py-2">Variance</th>
               <th className="px-3 py-2">Status</th>
+              <th className="px-3 py-2">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -145,6 +147,19 @@ export default function ReconciliationStep({ workspace, accounts, onComplete, on
                   <span className={`text-xs font-medium ${r.status === "reconciled" ? "text-sage" : "text-red-600"}`}>
                     {r.status === "reconciled" ? "Reconciled" : "Unreconciled"}
                   </span>
+                </td>
+                <td className="px-3 py-2">
+                  {r.status === "unreconciled" && onReviewAccount ? (
+                    <button
+                      type="button"
+                      onClick={() => onReviewAccount(r.accountId)}
+                      className="rounded border border-line px-2 py-1 text-xs hover:bg-paper"
+                    >
+                      Review transactions
+                    </button>
+                  ) : (
+                    <span className="text-xs text-slate-400">No action</span>
+                  )}
                 </td>
               </tr>
             ))}

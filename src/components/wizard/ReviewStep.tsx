@@ -8,6 +8,7 @@ import { getCategoriesByReport, isValidCategory } from "@/domain/categoryOptions
 
 type Props = {
   workspace: Workspace;
+  initialAccountId?: string | null;
   onComplete: () => void;
   onBack?: () => void;
 };
@@ -45,13 +46,14 @@ function CategorySelect({ currentCategory, onChange }: { currentCategory: string
   );
 }
 
-export default function ReviewStep({ workspace, onComplete, onBack }: Props) {
+export default function ReviewStep({ workspace, initialAccountId, onComplete, onBack }: Props) {
   const [items, setItems] = useState<TransactionWithClassification[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"exceptions" | "all">("exceptions");
+  const [activeTab, setActiveTab] = useState<"exceptions" | "all" | "related" | "low">("exceptions");
   const [filter, setFilter] = useState("");
+  const [accountFilter, setAccountFilter] = useState(initialAccountId ?? "");
 
   const loadCounts = useCallback(async () => {
     const res = await fetch(`/api/transactions?workspaceId=${workspace.id}`);
@@ -70,9 +72,16 @@ export default function ReviewStep({ workspace, onComplete, onBack }: Props) {
   }, [workspace.id]);
 
   useEffect(() => {
-    load(activeTab === "all");
+    load(activeTab !== "exceptions");
     loadCounts();
   }, [load, loadCounts, activeTab]);
+
+  useEffect(() => {
+    if (initialAccountId) {
+      setAccountFilter(initialAccountId);
+      setActiveTab("all");
+    }
+  }, [initialAccountId]);
 
   async function handleAction(action: "approve" | "exclude", transactionIds: string[], newCategory?: string) {
     await fetch("/api/classifications", {
@@ -103,6 +112,14 @@ export default function ReviewStep({ workspace, onComplete, onBack }: Props) {
   }
 
   const filtered = items.filter((t) => {
+    if (accountFilter && t.bankAccountId !== accountFilter) return false;
+    if (activeTab === "related") {
+      const haystack = `${t.description} ${t.classification?.finalCategory ?? ""} ${t.classification?.ruleUsed ?? ""}`.toLowerCase();
+      if (!/(valoris|related party|intercompany|affiliate|due from related|due to related|member distributions)/.test(haystack)) return false;
+    }
+    if (activeTab === "low") {
+      if (!["low", "medium"].includes(t.classification?.confidence ?? "")) return false;
+    }
     if (!filter) return true;
     const q = filter.toLowerCase();
     return t.description.toLowerCase().includes(q) || (t.classification?.finalCategory ?? "").toLowerCase().includes(q);
@@ -131,6 +148,18 @@ export default function ReviewStep({ workspace, onComplete, onBack }: Props) {
           >
             All Transactions ({totalCount})
           </button>
+          <button
+            onClick={() => setActiveTab("related")}
+            className={`text-sm px-3 py-1 rounded ${activeTab === "related" ? "bg-ink text-white" : "text-slate-500 hover:text-ink"}`}
+          >
+            Related Parties
+          </button>
+          <button
+            onClick={() => setActiveTab("low")}
+            className={`text-sm px-3 py-1 rounded ${activeTab === "low" ? "bg-ink text-white" : "text-slate-500 hover:text-ink"}`}
+          >
+            Low Confidence
+          </button>
         </div>
       </div>
 
@@ -148,6 +177,15 @@ export default function ReviewStep({ workspace, onComplete, onBack }: Props) {
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
             />
+            <input
+              className="w-48 rounded border border-line px-3 py-2 text-sm"
+              placeholder="Account ID filter"
+              value={accountFilter}
+              onChange={(e) => setAccountFilter(e.target.value)}
+            />
+            {accountFilter && (
+              <button onClick={() => setAccountFilter("")} className="text-xs text-slate-500 underline">Clear account</button>
+            )}
             <button onClick={selectAll} className="text-xs text-sage underline">Select all</button>
             <button onClick={clearSelection} className="text-xs text-slate-500 underline">Clear</button>
             {selected.size > 0 && (

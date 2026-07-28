@@ -1,6 +1,6 @@
 import { classifyTransaction } from "./classification";
 import { CATEGORY_OPTIONS } from "./categoryOptions";
-import { importRows } from "./importXlsx";
+import { importStatementRows } from "./statementImport";
 import type {
   Classification,
   ColumnMapping,
@@ -17,7 +17,7 @@ export function preclassifyImportRows(
   bankAccountId: string,
   taxYear: number
 ): PreclassificationResult {
-  const { rows, errors } = importRows(data, fileName, mapping, workspaceId, bankAccountId, taxYear);
+  const { rows, errors } = importStatementRows(data, fileName, mapping, workspaceId, bankAccountId, taxYear);
 
   const preclassifiedRows = rows.map((row) => {
     const transactionForClassification: Transaction = {

@@ -7,14 +7,19 @@ import { createClient } from "@/lib/supabase/browser";
 
 const FALLBACK_ERROR_MESSAGE = "Check your connection and Supabase Auth settings, then try again.";
 
+function isReadableErrorMessage(message: string): boolean {
+  const normalized = message.trim();
+  return Boolean(normalized) && !["{}", "[]", "null", "undefined"].includes(normalized);
+}
+
 function getErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message;
+  if (error instanceof Error && isReadableErrorMessage(error.message)) return error.message;
   if (
     error &&
     typeof error === "object" &&
     "message" in error &&
     typeof error.message === "string" &&
-    error.message.trim()
+    isReadableErrorMessage(error.message)
   ) {
     return error.message;
   }

@@ -73,7 +73,7 @@ describe("RegisterForm", () => {
   it("shows a useful fallback when Supabase returns an unreadable sign-up error", async () => {
     mockSignUp.mockResolvedValue({
       data: { session: null },
-      error: { message: {} },
+      error: { message: "{}" },
     });
 
     render(<RegisterForm />);

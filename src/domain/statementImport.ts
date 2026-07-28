@@ -148,8 +148,9 @@ function parseCsv(data: ArrayBuffer | Uint8Array | Buffer, fileName: string): Pa
     };
   }
 
-  const rows = parsed.data.map((row) => stringifyRow(row));
-  const columns = parsed.meta.fields ?? (rows[0] ? Object.keys(rows[0]).filter((key) => key !== "__parsed_extra") : []);
+  const firstRow = parsed.data[0] ? stringifyRow(parsed.data[0]) : null;
+  const columns = parsed.meta.fields ?? (firstRow ? Object.keys(firstRow).filter((key) => key !== "__parsed_extra") : []);
+  const rows = parsed.data.map((row) => repairCsvRow(row as Record<string, unknown>, columns));
   const fieldMismatchCount = parsed.errors.length - fatalErrors.length;
   return {
     rows,
@@ -160,6 +161,32 @@ function parseCsv(data: ArrayBuffer | Uint8Array | Buffer, fileName: string): Pa
       : [],
     errors: rows.length === 0 ? ["CSV file is empty"] : [],
   };
+}
+
+function repairCsvRow(rawRow: Record<string, unknown>, columns: string[]): Record<string, string> {
+  const extras = Array.isArray((rawRow as any).__parsed_extra) ? (rawRow as any).__parsed_extra.map((value: unknown) => String(value ?? "")) : [];
+  delete (rawRow as any).__parsed_extra;
+  const row = stringifyRow(rawRow);
+  if (extras.length === 0) return row;
+
+  const amountColumn = matchColumn(columns, AMOUNT_ALIASES);
+  if (!amountColumn) return row;
+  const amountIndex = columns.indexOf(amountColumn);
+  const nextColumn = columns[amountIndex + 1];
+  if (!nextColumn) return row;
+
+  const amount = row[amountColumn] ?? "";
+  const next = row[nextColumn] ?? "";
+  const combined = `${amount},${next}`;
+  if (parseAmount(combined) === null) return row;
+
+  row[amountColumn] = combined;
+  for (let index = amountIndex + 1; index < columns.length; index++) {
+    const column = columns[index];
+    const replacement = index === columns.length - 1 ? extras[index - amountIndex - 1] : row[columns[index + 1]];
+    if (replacement !== undefined) row[column] = replacement;
+  }
+  return row;
 }
 
 function parseTextPdf(data: ArrayBuffer | Uint8Array | Buffer, fileName: string): ParsedTable {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as XLSX from "xlsx";
 import { buildStatementPreview, importStatementRows } from "../../src/domain/statementImport";
+import { preclassifyImportRows } from "../../src/domain/importPreclassification";
 
 function makeWorkbook(rows: Record<string, string>[]): Buffer {
   const ws = XLSX.utils.json_to_sheet(rows);
@@ -77,6 +78,144 @@ describe("statementImport", () => {
       amount: "Amount",
       balance: "Balance",
     });
+
+    const { rows, errors } = importStatementRows(
+      csv,
+      "chase.csv",
+      { date: "Posting Date", description: "Description", amount: "Amount", transactionType: "Type", balance: "Balance" },
+      "ws-1",
+      "ba-1",
+      2026
+    );
+    expect(errors).toEqual([]);
+    expect(rows).toHaveLength(2);
+    expect(rows[1]).toMatchObject({
+      date: "2026-01-06",
+      description: "Rental Income",
+      amount: 1200,
+      classificationText: "Rental Income | ACH",
+    });
+  });
+
+  it("handles quoted commas, BOM, CRLF, and accounting parentheses in CSV", () => {
+    const csv = Buffer.from("\uFEFFDate,Description,Amount,Balance\r\n01/07/2026,\"Vendor, Inc.\",($1,234.56),8765.44\r\n");
+
+    const preview = buildStatementPreview(csv, "quoted.csv");
+    expect(preview.errors).toEqual([]);
+    expect(preview.detectedMapping).toMatchObject({
+      date: "Date",
+      description: "Description",
+      amount: "Amount",
+      balance: "Balance",
+    });
+
+    const { rows, errors } = importStatementRows(
+      csv,
+      "quoted.csv",
+      { date: "Date", description: "Description", amount: "Amount", balance: "Balance" },
+      "ws-1",
+      "ba-1",
+      2026
+    );
+    expect(errors).toEqual([]);
+    expect(rows[0]).toMatchObject({
+      description: "Vendor, Inc.",
+      amount: -1234.56,
+      balance: 8765.44,
+    });
+  });
+
+  it("imports debit and credit CSV columns with payee and merchant details", () => {
+    const csv = Buffer.from([
+      "Transaction Date,Payee,Memo,Debit,Credit,Merchant Category,Running Balance",
+      "02/01/2026,Shell,Mileage reimbursement fuel,72.14,,Fuel,9927.86",
+      "02/02/2026,Tenant A,February rent,,1500.00,Rental,11427.86",
+    ].join("\n"));
+
+    const preview = buildStatementPreview(csv, "debit-credit.csv");
+    expect(preview.errors).toEqual([]);
+    expect(preview.detectedMapping).toMatchObject({
+      date: "Transaction Date",
+      description: "Memo",
+      payee: "Payee",
+      debit: "Debit",
+      credit: "Credit",
+      merchantCategory: "Merchant Category",
+      balance: "Running Balance",
+    });
+
+    const { rows, errors } = importStatementRows(
+      csv,
+      "debit-credit.csv",
+      {
+        date: "Transaction Date",
+        description: "Memo",
+        payee: "Payee",
+        debit: "Debit",
+        credit: "Credit",
+        merchantCategory: "Merchant Category",
+        balance: "Running Balance",
+      },
+      "ws-1",
+      "ba-1",
+      2026
+    );
+    expect(errors).toEqual([]);
+    expect(rows.map((row) => row.amount)).toEqual([-72.14, 1500]);
+    expect(rows[0].classificationText).toBe("Shell | Mileage reimbursement fuel | Fuel");
+  });
+
+  it("preclassifies enriched CSV rows using bank-provided merchant signals", () => {
+    const csv = Buffer.from([
+      "Transaction Date,Payee,Memo,Debit,Credit,Merchant Category,Running Balance",
+      "02/01/2026,Shell,Mileage reimbursement,72.14,,Fuel,9927.86",
+      "02/02/2026,T Mobile,Monthly phone bill,89.99,,Telecom Communications,9837.87",
+    ].join("\n"));
+
+    const result = preclassifyImportRows(
+      csv,
+      "merchant-signals.csv",
+      {
+        date: "Transaction Date",
+        description: "Memo",
+        payee: "Payee",
+        debit: "Debit",
+        credit: "Credit",
+        merchantCategory: "Merchant Category",
+        balance: "Running Balance",
+      },
+      "ws-1",
+      "ba-1",
+      2026
+    );
+
+    expect(result.errors).toEqual([]);
+    expect(result.rows.map((row) => row.proposedClassification.finalCategory)).toEqual(["Other Expense", "Utilities"]);
+    expect(result.rows.every((row) => row.proposedClassification.reportType === "P&L")).toBe(true);
+  });
+
+  it("auto-detects semicolon-delimited CSV exports", () => {
+    const csv = Buffer.from("Date;Description;Amount;Balance\n03/01/2026;Bank Fee;-35.00;9965.00");
+
+    const preview = buildStatementPreview(csv, "semicolon.csv");
+    expect(preview.errors).toEqual([]);
+    expect(preview.columns).toEqual(["Date", "Description", "Amount", "Balance"]);
+
+    const { rows, errors } = importStatementRows(
+      csv,
+      "semicolon.csv",
+      { date: "Date", description: "Description", amount: "Amount", balance: "Balance" },
+      "ws-1",
+      "ba-1",
+      2026
+    );
+    expect(errors).toEqual([]);
+    expect(rows[0].amount).toBe(-35);
+  });
+
+  it("rejects unsupported file types with a clear error", () => {
+    const preview = buildStatementPreview(Buffer.from("Date,Description,Amount"), "statement.txt");
+    expect(preview.errors).toEqual(["Unsupported file type. Upload CSV, XLSX, or text-based PDF."]);
   });
 
   it("keeps XLSX support through the unified importer", () => {

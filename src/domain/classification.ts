@@ -189,12 +189,13 @@ export function classifyTransaction(transaction: Transaction): Classification {
     return HIGH(transaction.id, "Interest Expense", "P&L", "Interest expense pattern");
   }
 
+  if (has(text, [/\bFUEL\b/, /GAS STATION/, /SERVICE STATION/, /\bSHELL\b/, /\bCHEVRON\b/, /\bEXXON\b/, /\bBP\b/])) {
+    return HIGH(transaction.id, "Other Expense", "P&L", "Fuel / station merchant detail");
+  }
+
   // P&L — Other Expense
-  if (has(text, [/SUPPLIES/, /POSTAGE/, /PRINTING/, /ADVERTISING/, /MARKETING/, /SOFTWARE/, /SUBSCRIPTION/, /DUES/, /\bFUEL\b/, /GAS STATION/, /SERVICE STATION/, /\bSHELL\b/, /\bCHEVRON\b/, /\bEXXON\b/, /\bBP\b/])) {
-    const rule = has(text, [/\bFUEL\b/, /GAS STATION/, /SERVICE STATION/, /\bSHELL\b/, /\bCHEVRON\b/, /\bEXXON\b/, /\bBP\b/])
-      ? "Fuel / station merchant detail"
-      : "Other operating expense pattern";
-    return HIGH(transaction.id, "Other Expense", "P&L", rule);
+  if (has(text, [/SUPPLIES/, /POSTAGE/, /PRINTING/, /ADVERTISING/, /MARKETING/, /SOFTWARE/, /SUBSCRIPTION/, /DUES/])) {
+    return MEDIUM(transaction.id, "Other Expense", "P&L", "Other operating expense pattern");
   }
 
   // K-1 / Tax items → CPA review

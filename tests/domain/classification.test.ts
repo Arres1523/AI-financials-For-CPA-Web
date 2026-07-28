@@ -73,10 +73,12 @@ describe("classifyTransaction", () => {
     expect(c.finalCategory).toBe("Utilities");
   });
 
-  it("classifies software subscriptions as other expense", () => {
+  it("keeps software subscriptions on the original support-needed rule", () => {
     const c = classifyTransaction(tx("ZOOM.US SOFTWARE SUBSCRIPTION", -15.99));
     expect(c.reportType).toBe("P&L");
     expect(c.finalCategory).toBe("Other Expense");
+    expect(c.confidence).toBe("medium");
+    expect(c.reviewStatus).toBe("support_needed");
   });
 
   it("flags capital improvements for support needed", () => {

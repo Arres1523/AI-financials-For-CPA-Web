@@ -137,23 +137,27 @@ function parseCsv(data: ArrayBuffer | Uint8Array | Buffer, fileName: string): Pa
     header: true,
     skipEmptyLines: true,
   });
-  if (parsed.errors.length > 0) {
+  const fatalErrors = parsed.errors.filter((error) => error.code !== "TooManyFields" && error.code !== "TooFewFields");
+  if (fatalErrors.length > 0) {
     return {
       rows: [],
       columns: [],
       sourceName: fileName,
       warnings: [],
-      errors: parsed.errors.map((error) => error.message),
+      errors: fatalErrors.map((error) => error.message),
     };
   }
 
   const rows = parsed.data.map((row) => stringifyRow(row));
-  const columns = rows[0] ? Object.keys(rows[0]) : (parsed.meta.fields ?? []);
+  const columns = parsed.meta.fields ?? (rows[0] ? Object.keys(rows[0]).filter((key) => key !== "__parsed_extra") : []);
+  const fieldMismatchCount = parsed.errors.length - fatalErrors.length;
   return {
     rows,
     columns,
     sourceName: fileName,
-    warnings: [],
+    warnings: fieldMismatchCount > 0
+      ? [`CSV field count mismatch found in ${fieldMismatchCount} row${fieldMismatchCount === 1 ? "" : "s"}. Review the preview and column mapping before import.`]
+      : [],
     errors: rows.length === 0 ? ["CSV file is empty"] : [],
   };
 }
@@ -234,7 +238,11 @@ function detectColumns(headers: string[]): { mapping: Partial<ColumnMapping>; co
 }
 
 function matchColumn(headers: string[], aliases: RegExp[]): string | undefined {
-  return headers.find((header) => aliases.some((alias) => alias.test(header.trim())));
+  for (const alias of aliases) {
+    const match = headers.find((header) => alias.test(header.trim()));
+    if (match) return match;
+  }
+  return undefined;
 }
 
 function importTableRows(

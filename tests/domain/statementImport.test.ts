@@ -58,6 +58,27 @@ describe("statementImport", () => {
     });
   });
 
+  it("treats CSV field count mismatches as warnings instead of blocking mapping", () => {
+    const csv = Buffer.from([
+      "Details,Posting Date,Description,Amount,Type,Balance,Check or Slip #",
+      "DEBIT,01/05/2026,Payment with extra comma in text,-12.00,ACH,9988.00,",
+      "CREDIT,01/06/2026,Rental Income,1200.00,ACH,11188.00,,unexpected",
+    ].join("\n"));
+
+    const preview = buildStatementPreview(csv, "chase.csv");
+    expect(preview.fileType).toBe("csv");
+    expect(preview.columns).toEqual(["Details", "Posting Date", "Description", "Amount", "Type", "Balance", "Check or Slip #"]);
+    expect(preview.totalRows).toBe(2);
+    expect(preview.errors).toEqual([]);
+    expect(preview.warnings?.some((warning) => warning.includes("field count"))).toBe(true);
+    expect(preview.detectedMapping).toMatchObject({
+      date: "Posting Date",
+      description: "Description",
+      amount: "Amount",
+      balance: "Balance",
+    });
+  });
+
   it("keeps XLSX support through the unified importer", () => {
     const workbook = makeWorkbook([
       { Date: "01/05/2026", Description: "Rental income January", Amount: "12000.00", Balance: "12000.00" },

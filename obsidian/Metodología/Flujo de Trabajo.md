@@ -5,7 +5,7 @@ tags:
 ---
 # Flujo de Trabajo
 
-## Vista General — 6 Pasos
+## Vista General — MVP V2
 
 ```
 [1] Company & Tax Year
@@ -21,21 +21,31 @@ tags:
             ▼
 [3] Upload
     ├── Seleccionar cuenta destino
-    ├── Subir archivo(s) XLSX
+    ├── Subir archivo(s) CSV, XLSX o PDF con texto seleccionable
     ├── Mapear columnas (Date*, Description*, Amount | Debit+Credit, Balance)
+    ├── Ver warnings no bloqueantes de parsing/mapping
     └── Importar (parsea, valida año fiscal, clasifica, inserta)
             │
             ▼
 [4] Review
-    ├── Pestaña "Exceptions" → transacciones pendientes de revisión (baja confianza)
+    ├── Pestaña "Exceptions" → transacciones pendientes de revisión
     ├── Pestaña "All Transactions"
+    ├── Pestaña "Related Parties"
+    ├── Pestaña "Credit Cards"
+    ├── Pestaña "Low Confidence"
+    ├── Pestaña "Unreconciled Account"
     ├── Aprobar / Excluir / Recategorizar individual o bulk
+    ├── Marcar CPA Review / Support Needed
+    ├── Corregir fecha, descripción o monto con auditoría
+    ├── Crear regla recurrente por compañía desde una corrección
     └── Categorías agrupadas en P&L vs Balance Sheet
             │
             ▼
 [5] Reconciliation
     ├── Agrupa por cuenta bancaria
     ├── Calcula: Apertura + Movimiento - Cierre = Variación
+    ├── Muestra statements asociados, cantidad de transacciones y posibles causas
+    ├── Botón "Review transactions" abre Review filtrado por cuenta
     └── Muestra estado: "Reconciled" / "Unreconciled"
             │
             ▼
@@ -48,9 +58,11 @@ tags:
     │   ├── "preliminary_balance_sheet" → BS apertura presente pero hay issues
     │   └── "complete_balance_sheet" → todo satisfecho
     ├── Transfer Matching automático (excluye transfers internos del P&L/BS)
+    ├── Shortcuts directos a unresolved, related parties, credit cards y unreconciled
     ├── Exportar workbook XLSX:
     │   ├── P&L + BS + Cash Rollforward + Reconciliation + Report Status
-    │   └── Transaction History con 12 columnas de auditoría (opcional)
+    │   ├── Statement Files y Review Log cuando hay datos
+    │   └── Transaction History con columnas de auditoría (opcional)
     └── Exportar CPA memo DOCX
 ```
 
@@ -69,12 +81,16 @@ Antes de llegar a Results, el usuario puede proveer saldos de apertura:
 3. Usuario mapea columnas → Client-side state
 4. POST /api/import → Server-side:
    a. Hash SHA-256 → detecta duplicados
-   b. Parse XLSX (SheetJS, primera hoja)
+   b. Detecta formato CSV / XLSX / PDF text-based
    c. Validar fechas (año fiscal estricto)
-   d. Clasificar cada transacción (reglas deterministas)
+   d. Clasificar cada transacción (reglas deterministas + reglas recurrentes por compañía como sugerencia revisable)
    e. Transacción BD: statement + transactions + classifications
 5. Response → UI muestra resultados (success / partial / error)
 ```
+
+## Regla De Demo Vercel
+
+Para mostrar MVP V2 públicamente, usar [[Demo Vercel MVP V2]] y preferir el Preview del branch `MvpV2` hasta decidir promoción a Production.
 
 ## Estados del Workspace
 
@@ -92,3 +108,4 @@ Antes de llegar a Results, el usuario puede proveer saldos de apertura:
 - [[Clasificación de Transacciones]]
 - [[Componentes UI]]
 - [[Errores Conocidos]]
+- [[Demo Vercel MVP V2]]

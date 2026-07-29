@@ -58,8 +58,24 @@ tags:
 | Vercel | Hosting Next.js |
 | Supabase / Neon | PostgreSQL hosting |
 
+## Vercel Demo MVP V2
+
+- Proyecto Vercel: `arres1523/ai-financials-for-cpa-web`
+- Branch demo: `MvpV2`
+- Preview recomendado: [ai-financials-for-cpa-web-git-mvpv2-arres1523.vercel.app](https://ai-financials-for-cpa-web-git-mvpv2-arres1523.vercel.app)
+- Production actual: [ai-financials-for-cpa-web.vercel.app](https://ai-financials-for-cpa-web.vercel.app)
+- Variables verificadas en Vercel:
+  - `DATABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+- Variables pendientes si se prueba email delivery:
+  - `RESEND_API_KEY`
+  - `RESEND_FROM_EMAIL`
+
 ## 🔗 Enlaces Relacionados
 
 - [[Arquitectura]]
 - [[Notas del Proyecto]]
 - [[Glosario]]
+- [[Demo Vercel MVP V2]]

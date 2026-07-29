@@ -100,6 +100,7 @@ If registration fails in production:
 - **Multi-step wizard**: Company setup → bank accounts → upload/import → preclassification review → classification review → reconciliation
 - **Multi-format statement import**: CSV, XLSX, and best-effort text-based PDF parsing with column mapping and review warnings
 - **Deterministic classification**: Rule-based (regex) — no AI costs, no data sent externally
+- **Company classification rules**: recurring company-scoped suggestions remain reviewable before approval
 - **Transfer matching**: Auto-detect internal transfers between accounts, exclude from P&L
 - **Suspense tracking**: Transactions needing review block "complete" report mode
 - **Cash rollforward**: Opening cash + inflows - outflows = calculated ending; variance shown as-is
@@ -139,7 +140,7 @@ If registration fails in production:
 - No external AI inference — classification is rule-based.
 - Balance Sheet is explicitly preliminary — based on classified bank activity, not full accounting records.
 - No automatic journal entries, tax basis calculations, or QuickBooks integration.
-- `classification_rules` table exists but is reserved for a future phase — no automatic learning.
+- `classification_rules` are company-scoped suggestions, not automatic final approvals.
 - Resend free tier (`onboarding@resend.dev`) can only send to the account owner's email. Verify a custom domain for production.
 
 ## Documentation

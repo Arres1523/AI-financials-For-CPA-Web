@@ -27,6 +27,17 @@ tags:
    - Review policy centralizado con estados de documentación
    - Workbook XLSX con 5 sheets (Report Status, P&L, BS, Cash Rollforward, Reconciliation)
    - Supabase MCP configurado
+4. **MVP V2 CPA Workflow — 2026-07-28:** Expansión según llamada con CPA:
+   - Importación CSV, XLSX y PDF text-based.
+   - Preclassification y Review como flujo de sugerencia + revisión humana.
+   - `SOFTWARE/SUBSCRIPTION` preservado como `Other Expense`, `medium`, `support_needed`.
+   - Reglas recurrentes por compañía como sugerencias revisables.
+   - Review tabs para exceptions, all transactions, related parties, credit cards, low confidence y unreconciled account.
+   - Reconciliation con possible causes y navegación a review filtrado.
+   - Corrección auditada de fecha, descripción y monto.
+   - Workbook con Statement Files y Review Log.
+   - CPA memo con formatos importados, related-party items, variances y limitación PDF text-based.
+5. **Demo Vercel — 2026-07-29:** Preview `MvpV2` verificado como Ready para demo externa guiada. Ver [[Demo Vercel MVP V2]].
 
 ## Convenciones del Código
 
@@ -72,3 +83,4 @@ colors: {
 - [[Stack Tecnológico]]
 - [[Glosario]]
 - [[Roadmap]]
+- [[Demo Vercel MVP V2]]

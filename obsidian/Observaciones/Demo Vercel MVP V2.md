@@ -11,12 +11,11 @@ date: 2026-07-29
 ## Estado Verificado
 
 > [!success] Preview actualizado
-> El branch `MvpV2` está sincronizado con `origin/MvpV2` en el commit `efe144f` (`feat: add CPA review control workflow`). Vercel tiene un Preview Ready creado el 2026-07-28 17:28 COT, inmediatamente después de ese commit.
+> El branch `MvpV2` está sincronizado con `origin/MvpV2`. El commit de producto verificado es `efe144f` (`feat: add CPA review control workflow`) y la documentación de demo está actualizada en el mismo branch. Vercel generó un Preview Ready para el branch alias.
 
 ## URLs Para Mostrar
 
 - Preview estable del branch: [ai-financials-for-cpa-web-git-mvpv2-arres1523.vercel.app](https://ai-financials-for-cpa-web-git-mvpv2-arres1523.vercel.app)
-- Deployment específico verificado: [ai-financials-for-cpa-bftfo5gx9-arres1523.vercel.app](https://ai-financials-for-cpa-bftfo5gx9-arres1523.vercel.app)
 - Production actual: [ai-financials-for-cpa-web.vercel.app](https://ai-financials-for-cpa-web.vercel.app)
 
 > [!warning] Production no es el enlace recomendado para esta demo
@@ -24,7 +23,7 @@ date: 2026-07-29
 
 ## Verificación Técnica Ejecutada
 
-- `git fetch origin && git status --short --branch`: `MvpV2...origin/MvpV2`, sin cambios de código pendientes.
+- `git fetch origin && git status --short --branch`: `MvpV2...origin/MvpV2`.
 - `vercel whoami`: autenticado como `miguelbolano101-4417`.
 - `.vercel/repo.json`: proyecto linkeado a `arres1523/ai-financials-for-cpa-web`.
 - `vercel env ls`: variables esenciales presentes en Preview y Production:
@@ -33,6 +32,7 @@ date: 2026-07-29
   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
   - `SUPABASE_SERVICE_ROLE_KEY`
 - `curl -I` sobre Preview: responde `307` hacia `/login`, esperado por Supabase Auth.
+- `vercel inspect --wait` sobre el Preview generado por `MvpV2`: status `Ready`.
 
 ## Limitaciones De Demo
 
